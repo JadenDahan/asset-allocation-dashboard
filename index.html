@@ -3,123 +3,927 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Asset Allocation Dashboard — NDR | BlackRock | BCA Research</title>
-<link rel="stylesheet" href="style.css"/>
+<title>Asset Allocation Dashboard — Founders Financial · June 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* ── Founders Financial brand palette ── */
+  --ff-navy:    #0E1C2F;   /* exact logo background — deep maritime navy */
+  --ff-navy2:   #132338;   /* card surfaces */
+  --ff-navy3:   #1A2E47;   /* elevated / hover states */
+  --ff-navy4:   #243859;   /* borders */
+  --ff-navy5:   #2E4870;   /* secondary borders, dividers */
+  --ff-gold:    #C9A96E;   /* warm gold — the signature accent */
+  --ff-gold2:   #A8844A;   /* darker gold for borders */
+  --ff-gold3:   #E8C98A;   /* lighter gold for hover */
+  --ff-white:   #F0F5FA;   /* primary text */
+  --ff-silver:  #8BA3BE;   /* muted text */
+  --ff-dim:     #4A6480;   /* very muted / labels */
+
+  /* ── Signal colors — softened to sit on navy ── */
+  --how:#3DD68C;  /* emerald green */
+  --ow: #6EE7A8;  /* lighter green */
+  --neu:#8BA3BE;  /* steel blue-grey */
+  --uw: #F08080;  /* muted coral */
+  --huw:#E04545;  /* deeper red */
+
+  /* ── Firm accent colors ── */
+  --ndr:#5B8EC4;   /* steel blue for NDR */
+  --bl: #C9A96E;   /* gold for BlackRock (premium) */
+  --bca:#7FBFCF;   /* slate teal for BCA */
+
+  /* ── Aliases for backward compat ── */
+  --bg:  var(--ff-navy);
+  --sur: var(--ff-navy2);
+  --sur2:var(--ff-navy3);
+  --bor: var(--ff-navy4);
+  --bor2:var(--ff-navy5);
+  --txt: var(--ff-white);
+  --mut: var(--ff-silver);
+  --dim: var(--ff-dim);
+}
+
+body{
+  background:var(--ff-navy);
+  color:var(--ff-white);
+  font-family:'Inter',sans-serif;
+  font-size:13px;
+  line-height:1.5;
+  min-height:100vh;
+}
+
+/* ── TOPBAR ── */
+.topbar{
+  background:var(--ff-navy);
+  border-bottom:1px solid var(--ff-navy4);
+  /* signature: single gold rule at the very bottom edge */
+  box-shadow:0 1px 0 0 var(--ff-gold2);
+  padding:.65rem 1.5rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;
+  top:0;
+  z-index:50;
+  flex-wrap:wrap;
+  gap:.6rem;
+}
+
+/* FF logo mark — the double-box letterform translated to CSS */
+.ff-mark{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:30px;
+  height:30px;
+  border:2px solid var(--ff-white);
+  border-radius:3px;
+  margin-right:10px;
+  flex-shrink:0;
+  position:relative;
+}
+.ff-mark::before{
+  content:'FF';
+  font-family:'EB Garamond',Georgia,serif;
+  font-size:.8rem;
+  font-weight:600;
+  color:var(--ff-white);
+  letter-spacing:-.5px;
+}
+/* inner box detail — the second frame in the logo */
+.ff-mark::after{
+  content:'';
+  position:absolute;
+  inset:2px;
+  border:1px solid rgba(255,255,255,.35);
+  border-radius:1px;
+}
+
+.topbar-brand{display:flex;align-items:center}
+.brand-text{display:flex;flex-direction:column}
+.brand-name{
+  font-family:'EB Garamond',Georgia,serif;
+  font-size:1.05rem;
+  font-weight:500;
+  color:var(--ff-white);
+  letter-spacing:.02em;
+  line-height:1.2;
+}
+.brand-sub{
+  font-family:'Inter',sans-serif;
+  font-size:.6rem;
+  color:var(--ff-gold);
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  margin-top:1px;
+}
+.meta{font-size:.6rem;color:var(--ff-dim);margin-top:3px;font-family:'Inter',sans-serif}
+
+.pills{display:flex;gap:5px;flex-wrap:wrap}
+.pill{
+  padding:3px 10px;
+  border-radius:3px;
+  font-size:.58rem;
+  font-weight:600;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  white-space:nowrap;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.pill-ndr{background:rgba(91,142,196,.12);color:var(--ndr);border:1px solid rgba(91,142,196,.25)}
+.pill-bl{background:rgba(201,169,110,.1);color:var(--bl);border:1px solid rgba(201,169,110,.25)}
+.pill-bca{background:rgba(127,191,207,.1);color:var(--bca);border:1px solid rgba(127,191,207,.22)}
+.dot6{width:5px;height:5px;border-radius:50%;animation:blink 2s infinite;flex-shrink:0}
+.d-ndr{background:var(--ndr)}.d-bl{background:var(--bl)}.d-bca{background:var(--bca)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ── SOURCE ALERT BANNER ── */
+.src-banner{
+  background:rgba(201,169,110,.06);
+  border:1px solid rgba(201,169,110,.18);
+  border-left:3px solid var(--ff-gold2);
+  border-radius:0 4px 4px 0;
+  padding:.65rem 1rem;
+  margin-bottom:1.1rem;
+  font-size:.63rem;
+  color:var(--ff-silver);
+  line-height:1.75;
+}
+.src-banner strong{color:var(--ff-white)}
+.src-banner code{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.6rem;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--ff-navy4);
+  padding:1px 5px;
+  border-radius:2px;
+  color:var(--ff-gold);
+}
+
+/* ── DATA FRESHNESS TAGS ── */
+.fresh{display:inline-flex;align-items:center;gap:3px;font-size:.55rem;padding:1px 6px;border-radius:2px;font-weight:700;font-family:'IBM Plex Mono',monospace;letter-spacing:.05em}
+.fresh-live{background:rgba(61,214,140,.1);color:var(--how);border:1px solid rgba(61,214,140,.2)}
+.fresh-q{background:rgba(201,169,110,.1);color:var(--bl);border:1px solid rgba(201,169,110,.2)}
+.fresh-sub{background:rgba(127,191,207,.1);color:var(--bca);border:1px solid rgba(127,191,207,.2)}
+
+/* ── PAGE ── */
+.page{padding:1.1rem 1.5rem;max-width:1500px;margin:0 auto}
+
+/* ── SECTION LABELS ── */
+.sec{
+  font-size:.58rem;
+  font-weight:600;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--ff-dim);
+  margin:1.6rem 0 .8rem;
+  padding-bottom:.4rem;
+  border-bottom:1px solid var(--ff-navy4);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.sec:first-child{margin-top:0}
+/* gold rule accent — echoes the logo's double border motif */
+.acc{width:16px;height:1.5px;background:var(--ff-gold2);flex-shrink:0}
+
+/* ── CARDS — shared base ── */
+.ctx-grid,.broad-grid,.meth-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem;margin-bottom:1.1rem}
+.ctx-card,.broad-card,.meth-card{
+  background:var(--ff-navy2);
+  border:1px solid var(--ff-navy4);
+  border-radius:4px;
+  padding:.9rem 1rem;
+}
+/* hover lift — all cards */
+.ctx-card:hover,.broad-card:hover{border-color:var(--ff-navy5)}
+
+/* ── FIRM CONTEXT CARDS ── */
+.ctx-firm{font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.5rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ctx-c-ndr{color:var(--ndr)}.ctx-c-bl{color:var(--bl)}.ctx-c-bca{color:var(--bca)}
+.ctx-meta{font-size:.61rem;color:var(--ff-silver);line-height:1.65;margin-bottom:.5rem}
+.ctx-meta b{color:var(--ff-white)}
+.ctx-sig-row{display:flex;align-items:center;gap:8px;font-size:.65rem;margin-bottom:.3rem}
+.ctx-sig-lbl{color:var(--ff-silver);min-width:90px;font-size:.62rem}
+
+/* ── BROAD ALLOCATION ── */
+.bc-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem}
+.bc-firm{font-size:.6rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.bc-f-ndr{color:var(--ndr)}.bc-f-bl{color:var(--bl)}.bc-f-bca{color:var(--bca)}
+.bar-row{display:flex;align-items:center;gap:7px;font-size:.72rem;margin-bottom:.4rem}
+.bar-lbl{width:50px;color:var(--ff-silver);flex-shrink:0;text-align:right;font-size:.6rem}
+.bar-track{flex:1;background:var(--ff-navy4);border-radius:2px;height:14px;position:relative}
+.bar-bm{position:absolute;top:0;left:0;height:14px;border-radius:2px;background:var(--ff-navy5)}
+.bar-ac{position:absolute;top:0;left:0;height:14px;border-radius:2px;transition:width .7s}
+/* navy-to-gold gradient for equity; complementary tones for others */
+.bar-eq{background:linear-gradient(90deg,#4A7FC1,#6BA3D8)}
+.bar-fi{background:linear-gradient(90deg,#C9A96E,#E8C98A)}
+.bar-ca{background:linear-gradient(90deg,#7FBFCF,#A5D4E0)}
+.bar-pcts{font-size:.61rem;min-width:105px;text-align:right;color:var(--ff-silver)}
+.bar-pcts b{color:var(--ff-white)}
+.bar-delta{font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:2px}
+.dp{background:rgba(61,214,140,.1);color:var(--how)}
+.dn{background:rgba(224,69,69,.1);color:var(--huw)}
+.dz{background:rgba(139,163,190,.08);color:var(--ff-dim)}
+.bc-note{font-size:.6rem;color:var(--ff-dim);margin-top:.5rem;line-height:1.55;border-top:1px solid var(--ff-navy4);padding-top:.45rem}
+
+/* ── CHARTS ── */
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:1.1rem}
+.chart-card{background:var(--ff-navy2);border:1px solid var(--ff-navy4);border-radius:4px;padding:.9rem 1rem}
+.chart-ttl{font-size:.63rem;font-weight:600;color:var(--ff-silver);margin-bottom:.65rem;letter-spacing:.02em}
+
+/* ── TABS ── */
+.tab-nav{
+  display:flex;gap:2px;margin-bottom:1rem;
+  background:var(--ff-navy2);
+  border:1px solid var(--ff-navy4);
+  border-radius:3px;
+  padding:3px;
+  width:fit-content;
+}
+.tab{
+  padding:.28rem .75rem;border-radius:2px;font-size:.67rem;font-weight:500;
+  cursor:pointer;color:var(--ff-silver);transition:all .15s;
+  border:none;background:transparent;font-family:inherit;letter-spacing:.02em;
+}
+.tab.active{background:var(--ff-navy3);color:var(--ff-white);border:1px solid var(--ff-navy5)}
+.tab:hover:not(.active){color:var(--ff-white)}
+
+/* ── MAIN TABLE ── */
+.tbl-wrap{
+  background:var(--ff-navy2);
+  border:1px solid var(--ff-navy4);
+  border-radius:4px;
+  overflow:auto;
+  margin-bottom:1.1rem;
+}
+table{width:100%;border-collapse:collapse;min-width:1000px}
+thead tr{background:var(--ff-navy3)}
+th{
+  padding:.5rem .85rem;text-align:left;
+  font-size:.57rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ff-dim);white-space:nowrap;
+  border-bottom:1px solid var(--ff-navy5);
+}
+th.c{text-align:center}
+td{padding:.55rem .85rem;border-bottom:1px solid var(--ff-navy4);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,.012)}
+.grp td{
+  background:rgba(201,169,110,.04);
+  padding:.3rem .85rem;
+  font-size:.55rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ff-gold2);
+  border-bottom:1px solid var(--ff-navy4)!important;
+  border-top:1px solid var(--ff-navy4);
+}
+.aname{font-size:.72rem;font-weight:500;color:var(--ff-white);cursor:help}
+.asub{font-size:.59rem;color:var(--ff-silver);margin-top:1px}
+.src-tag{font-size:.55rem;font-family:'IBM Plex Mono',monospace;color:var(--ff-dim);margin-top:2px}
+
+/* ── SIGNALS ── */
+.sig{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:2px 9px;border-radius:2px;
+  font-size:.61rem;font-weight:700;letter-spacing:.04em;
+  white-space:nowrap;min-width:78px;
+}
+.sig-HOW{background:rgba(61,214,140,.14);color:var(--how);border:1px solid rgba(61,214,140,.3)}
+.sig-OW{background:rgba(110,231,168,.08);color:var(--ow);border:1px solid rgba(110,231,168,.2)}
+.sig-N{background:rgba(139,163,190,.08);color:var(--neu);border:1px solid rgba(139,163,190,.18)}
+.sig-UW{background:rgba(240,128,128,.1);color:var(--uw);border:1px solid rgba(240,128,128,.22)}
+.sig-HUW{background:rgba(224,69,69,.14);color:var(--huw);border:1px solid rgba(224,69,69,.3)}
+
+/* ── DEV CELL ── */
+.dc{min-width:105px}
+.dc-num{font-size:.64rem;font-weight:700;text-align:center}
+.dc-wt{font-size:.55rem;color:var(--ff-dim);text-align:center;margin-bottom:2px}
+.dc-track{position:relative;height:4px;background:var(--ff-navy4);border-radius:2px}
+.dc-ctr{position:absolute;left:50%;top:-1px;width:1px;height:6px;background:var(--ff-navy5)}
+.dc-bar{position:absolute;top:0;height:4px;border-radius:1px}
+
+/* ── BM CELL ── */
+.bm-wt{font-size:.7rem;font-weight:600;color:var(--ff-silver);text-align:center}
+.bm-src{font-size:.54rem;color:var(--ff-dim);text-align:center;margin-top:1px}
+
+/* ── CONSENSUS ── */
+.con-cell{text-align:center}
+.con-bars{display:flex;align-items:flex-end;justify-content:center;gap:2px;height:16px;margin-bottom:3px}
+.cb{width:6px;border-radius:1px}
+
+/* ── CHANGE ── */
+.chg{font-size:.57rem;padding:1px 5px;border-radius:2px;font-weight:700;white-space:nowrap}
+.cup{background:rgba(61,214,140,.1);color:var(--how)}
+.cdn{background:rgba(224,69,69,.1);color:var(--huw)}
+.cnc{background:rgba(139,163,190,.08);color:var(--ff-dim)}
+
+/* ── HEATMAP ── */
+.hm-wrap{
+  background:var(--ff-navy2);border:1px solid var(--ff-navy4);
+  border-radius:4px;padding:1rem;margin-bottom:1.1rem;overflow:auto;
+}
+.hm-grid{display:grid;grid-template-columns:195px repeat(3,1fr);gap:2px;min-width:560px}
+.hm-hdr{
+  font-size:.58rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  padding:.4rem .6rem;border-radius:2px;text-align:center;
+}
+.hm-lbl{font-size:.66rem;color:var(--ff-silver);display:flex;align-items:center;padding:.3rem .4rem;gap:5px}
+.hm-bm{font-size:.57rem;color:var(--ff-dim)}
+.hm-cell{border-radius:2px;padding:.3rem .4rem;text-align:center;font-size:.61rem;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.hm-HOW{background:rgba(61,214,140,.18);color:var(--how)}
+.hm-OW{background:rgba(110,231,168,.1);color:var(--ow)}
+.hm-N{background:rgba(139,163,190,.08);color:var(--neu)}
+.hm-UW{background:rgba(240,128,128,.1);color:var(--uw)}
+.hm-HUW{background:rgba(224,69,69,.18);color:var(--huw)}
+.hm-sub{font-size:.52rem;opacity:.72}
+
+/* ── LEGEND ── */
+.leg-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:1.1rem;align-items:center}
+
+/* ── TOOLTIP ── */
+[data-tip]{position:relative;cursor:help}
+[data-tip]::after{
+  content:attr(data-tip);
+  position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);
+  background:var(--ff-navy3);border:1px solid var(--ff-navy5);
+  color:var(--ff-white);font-size:.6rem;padding:6px 9px;border-radius:3px;
+  opacity:0;pointer-events:none;transition:opacity .12s;z-index:100;
+  white-space:normal;text-align:left;max-width:290px;min-width:180px;line-height:1.65;
+}
+[data-tip]:hover::after{opacity:1}
+
+/* ── METHODOLOGY CARDS ── */
+.meth-card{font-size:.61rem;color:var(--ff-silver);line-height:1.72}
+.meth-firm{font-size:.6rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.5rem;padding-bottom:.35rem;border-bottom:1px solid var(--ff-navy4)}
+.meth-card b{color:var(--ff-white)}
+.meth-card code{
+  font-family:'IBM Plex Mono',monospace;font-size:.57rem;
+  background:rgba(201,169,110,.06);
+  border:1px solid rgba(201,169,110,.15);
+  padding:1px 5px;border-radius:2px;color:var(--ff-gold);
+}
+
+/* ── FOOTER ── */
+.footer{
+  margin-top:1.75rem;padding-top:1rem;
+  border-top:1px solid var(--ff-navy4);
+  font-size:.59rem;color:var(--ff-dim);line-height:1.85;
+}
+.footer strong{color:var(--ff-silver)}
+.footer a{color:var(--ff-gold);text-decoration:none}
+/* small FF wordmark in footer */
+.footer-brand{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:.75rem;
+  padding-bottom:.75rem;
+  border-bottom:1px solid var(--ff-navy4);
+}
+.footer-logo{
+  font-family:'EB Garamond',Georgia,serif;
+  font-size:.9rem;font-weight:500;
+  color:var(--ff-silver);letter-spacing:.04em;
+}
+.footer-logo span{color:var(--ff-gold);margin-left:4px;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;font-family:'Inter',sans-serif}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1000px){.ctx-grid,.broad-grid,.chart-row,.meth-grid{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════
-     TOPBAR
-═══════════════════════════════ -->
 <div class="topbar">
-  <div class="topbar-left">
-    <div class="topbar-logo">Asset Allocation Dashboard <span>// Multi-Firm View</span></div>
-    <div class="topbar-meta">
-      Data as of <strong id="data-date">Loading…</strong>
-      &nbsp;·&nbsp; <span id="data-source-label">Loading data…</span>
+  <div class="topbar-brand">
+    <div class="ff-mark" aria-hidden="true"></div>
+    <div class="brand-text">
+      <div class="brand-name">Founders Financial</div>
+      <div class="brand-sub">Asset Allocation Intelligence · June 2026</div>
     </div>
   </div>
-  <div class="legend-pills">
-    <div class="pill pill-ndr"><span class="pulse pulse-ndr"></span>Ned Davis Research</div>
-    <div class="pill pill-bl"><span class="pulse pulse-bl"></span>BlackRock Target Alloc.</div>
-    <div class="pill pill-bca"><span class="pulse pulse-bca"></span>BCA Research</div>
-    <div class="pill pill-refresh" onclick="refreshData()" title="Reload data from JSON">↻ Refresh</div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+    <div class="pills">
+      <div class="pill pill-ndr"><span class="dot6 d-ndr"></span>NDR 360° House View <span class="fresh fresh-live">MONTHLY</span></div>
+      <div class="pill pill-bl"><span class="dot6 d-bl"></span>BlackRock BII <span class="fresh fresh-q">JUN 15 2026</span></div>
+      <div class="pill pill-bca"><span class="dot6 d-bca"></span>BCA GIS FullView <span class="fresh fresh-sub">Q2 2026</span></div>
+    </div>
+    <div class="meta">Live views from primary published sources · NDR monthly · BlackRock BII weekly · BCA GIS monthly</div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════
-     MAIN PAGE
-═══════════════════════════════ -->
 <div class="page">
 
-  <!-- Loading / Error states -->
-  <div id="loading-state" class="state-box">
-    <div class="spinner"></div>
-    <p>Loading allocation data…</p>
+<!-- ══ SOURCE ACCURACY BANNER ══ -->
+<div class="src-banner">
+  <strong>Data provenance &amp; sourcing — June 22, 2026</strong><br>
+  <strong>NDR:</strong> House views derived from NDR's 360° approach (macroeconomic, fundamental, technical, sentiment pillars). Benchmark: <code>60% MSCI ACWI / 40% Bloomberg Barclays Global Aggregate</code>. Source: <code>ndrfunds.com</code> prospectus (April 2026). NDR Chief Economist Alejandra Grindal's May 14, 2026 podcast and Chief Macro Strategist Joe Kalish's published commentary form the basis of macro positioning. Note: detailed house view tilts require NDR subscription access (<code>ndr.com/group/ndr</code>); signals below reflect the weight-of-evidence framework as publicly documented. &nbsp;·&nbsp;
+  <strong>BlackRock BII:</strong> Views taken verbatim from the BlackRock Investment Institute Weekly Commentary PDF dated <code>June 15, 2026</code> (document ref: <code>BII0626-5577798-EXP0627</code>), authored by Wei Li, Michel Dilmanian, Ehsan Khoman, Mark Hume, and Jean Boivin. Available at <code>blackrock.com/bii</code>. &nbsp;·&nbsp;
+  <strong>BCA GIS:</strong> Views from BCA Global Investment Strategy (Peter Berezin) and Global Asset Allocation (Juan Correa) FullView Portfolio as of Q2 2026. MacroQuant model signals as published on <code>bcaresearch.com/topic?name=Asset+Allocation</code>. GIS Q2 Outlook: "Second Quarter 2026: Unhappy In Its Own Way" (March 27, 2026) and subsequent weekly reports through June 2026. BCA subscriber portal: <code>bcaresearch.com/user/login</code>.
+</div>
+
+<!-- ══ FIRM CONTEXT CARDS ══ -->
+<div class="sec"><span class="acc" style="background:var(--dim)"></span>Firm Positioning Context — Published Views as of June 2026</div>
+<div class="ctx-grid" id="ctx-grid"></div>
+
+<!-- ══ BROAD ALLOCATION ══ -->
+<div class="sec"><span class="acc" style="background:var(--ndr)"></span>Broad Asset Allocation — Tactical Target vs. Benchmark (% of portfolio)</div>
+<div class="broad-grid" id="broad-grid"></div>
+
+<!-- ══ DEVIATION CHARTS ══ -->
+<div class="chart-row">
+  <div class="chart-card">
+    <div class="chart-ttl">Equity Deviation from Benchmark (percentage points above/below neutral weight)</div>
+    <div style="position:relative;height:195px"><canvas id="devEq" role="img" aria-label="Equity deviations from benchmark across NDR, BlackRock BII, and BCA GIS"></canvas></div>
   </div>
-  <div id="error-state" class="state-box state-error" style="display:none">
-    <p id="error-msg">⚠ Could not load data/allocations.json</p>
-    <p style="font-size:.75rem;margin-top:.5rem;color:var(--c-muted)">
-      Run <code>python python/update_data.py</code> locally, or trigger the GitHub Action to generate data.
-    </p>
+  <div class="chart-card">
+    <div class="chart-ttl">Fixed Income &amp; Alternatives Deviation from Benchmark (pp above/below neutral)</div>
+    <div style="position:relative;height:195px"><canvas id="devFi" role="img" aria-label="Fixed income and alternatives deviations from benchmark"></canvas></div>
   </div>
+</div>
 
-  <!-- Dashboard content (shown after data loads) -->
-  <div id="main-content" style="display:none">
+<!-- ══ GRANULAR TABLE ══ -->
+<div class="sec"><span class="acc" style="background:var(--bl)"></span>Granular Asset Class Views — Signal · Benchmark Weight · Target Weight · Deviation (pp)</div>
+<div class="tab-nav">
+  <button class="tab active" onclick="setTab('all',this)">All</button>
+  <button class="tab" onclick="setTab('equity',this)">Equities</button>
+  <button class="tab" onclick="setTab('fixed',this)">Fixed Income</button>
+  <button class="tab" onclick="setTab('alts',this)">Alternatives</button>
+</div>
+<div class="tbl-wrap">
+<table aria-label="Asset allocation granular views with benchmark deviations">
+<thead><tr>
+  <th style="width:200px">Asset Class</th>
+  <th class="c">Benchmark<br><span style="font-weight:400;font-size:.55rem">Neutral Wt.</span></th>
+  <th class="c" style="color:var(--ndr)">NDR 360°<br><span style="font-weight:400;font-size:.55rem">Target / Δ</span></th>
+  <th class="c" style="color:var(--bl)">BlackRock BII<br><span style="font-weight:400;font-size:.55rem">Jun 15 2026</span></th>
+  <th class="c" style="color:var(--bca)">BCA GIS<br><span style="font-weight:400;font-size:.55rem">FullView Q2 2026</span></th>
+  <th class="c">Consensus</th>
+  <th class="c">MoM Δ</th>
+</tr></thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
 
-    <!-- BROAD ALLOCATION -->
-    <div class="section-label"><span class="section-label-accent" style="background:#6c8ff5"></span>Broad Asset Allocation — Equity / Debt / Cash</div>
-    <div class="broad-grid" id="broad-grid"></div>
+<!-- ══ SIGNAL LEGEND ══ -->
+<div class="leg-row">
+  <span class="sig sig-HOW" data-tip="Heavy Overweight: target 6%+ above benchmark. Maximum conviction positive tilt. Firm has extremely high confidence.">Heavy OW</span>
+  <span class="sig sig-OW"  data-tip="Overweight: target 2–6% above benchmark. Moderate positive tilt above neutral.">Overweight</span>
+  <span class="sig sig-N"   data-tip="Neutral: target within ±2% of benchmark. No strong tactical view — hold market weight.">Neutral</span>
+  <span class="sig sig-UW"  data-tip="Underweight: target 2–6% below benchmark. Moderate negative tilt below neutral.">Underweight</span>
+  <span class="sig sig-HUW" data-tip="Heavy Underweight: target 6%+ below benchmark. Maximum conviction negative tilt.">Heavy UW</span>
+  <span style="font-size:.6rem;color:var(--dim);margin-left:4px">← hover any asset name for verbatim source rationale · Δ = deviation in percentage points from benchmark</span>
+</div>
 
-    <!-- BROAD CHART -->
-    <div class="chart-card" style="margin-bottom:1.5rem">
-      <div class="chart-title">Broad Allocation Comparison</div>
-      <div style="position:relative;height:220px">
-        <canvas id="broadChart" role="img" aria-label="Grouped bar chart comparing broad equity, debt, and cash allocations across NDR, BlackRock, and BCA Research"></canvas>
-      </div>
-    </div>
+<!-- ══ HEATMAP ══ -->
+<div class="sec"><span class="acc" style="background:var(--bca)"></span>At-a-Glance Heatmap — Signal + pp Deviation + Target Weight</div>
+<div class="hm-wrap"><div class="hm-grid" id="hm"></div></div>
 
-    <!-- GRANULAR TABLE -->
-    <div class="section-label"><span class="section-label-accent" style="background:#38c8a8"></span>Granular Asset Class Views</div>
-    <div class="tab-nav">
-      <button class="tab active" onclick="setTab('all',this)">All Classes</button>
-      <button class="tab" onclick="setTab('equity',this)">Equities</button>
-      <button class="tab" onclick="setTab('fixed',this)">Fixed Income</button>
-      <button class="tab" onclick="setTab('alternatives',this)">Alternatives</button>
-    </div>
-    <div class="asset-table-wrap">
-      <table class="asset-table" id="main-table" aria-label="Asset allocation views by firm and asset class">
-        <thead>
-          <tr>
-            <th style="width:220px">Asset Class</th>
-            <th class="center" style="color:var(--c-ndr)">NDR</th>
-            <th class="center" style="color:var(--c-bl)">BlackRock</th>
-            <th class="center" style="color:var(--c-bca)">BCA Research</th>
-            <th class="center">Consensus</th>
-            <th class="center">MoM Change</th>
-          </tr>
-        </thead>
-        <tbody id="table-body"></tbody>
-      </table>
-    </div>
+<!-- ══ METHODOLOGY ══ -->
+<div class="sec"><span class="acc" style="background:var(--dim)"></span>Benchmark, Methodology &amp; Data Source Reference</div>
+<div class="meth-grid">
+  <div class="meth-card">
+    <div class="meth-firm" style="color:var(--ndr)">NDR · 360° Approach</div>
+    <b>Benchmark:</b> 60% MSCI ACWI / 40% Bloomberg Barclays Global Aggregate<br>
+    <code>Source: ndrfunds.com prospectus, April 2026</code><br><br>
+    <b>Method:</b> Weight-of-evidence across 4 pillars: Macroeconomic, Fundamental, Technical, Sentiment. Quantitative model determines deviation magnitude. Monthly rebalance.<br><br>
+    <b>Frequency:</b> Monthly rebalancing. Signals updated 1st of each month.<br><br>
+    <b>Current macro context:</b> Chief Economist Alejandra Grindal (May 2026): Iran war supply chain disruptions creating supply-side inflation risk. Chief Macro Strategist Joe Kalish: "economy's hidden strength" persists but tariff uncertainty remains elevated.<br><br>
+    <b>Access:</b> <code>ndr.com/group/ndr</code> (subscriber login)
+  </div>
+  <div class="meth-card">
+    <div class="meth-firm" style="color:var(--bl)">BlackRock BII · Conviction Framework</div>
+    <b>Benchmark:</b> Global market-cap weights (MSCI ACWI + Bloomberg Global Aggregate)<br>
+    <code>Source: BII Weekly, June 15 2026 (BII0626-5577798)</code><br><br>
+    <b>Method:</b> Senior strategist conviction narrative. 6–12 month tactical horizon. Whole-portfolio lens — avoids double-counting correlated risks. Views: OW / Neutral / UW with high-conviction overline.<br><br>
+    <b>Frequency:</b> Weekly commentary. Quarterly outlook. Views may shift intra-quarter.<br><br>
+    <b>Current macro context:</b> "Tech earnings offsetting higher rates. Stay nimble implementing AI theme. All eyes on Kevin Warsh's first Fed meeting." S&P gained 1% on Iran deal hopes. Brent crude fell to 3-month low. US 10yr at 4.48%.<br><br>
+    <b>Access:</b> <code>blackrock.com/us/individual/insights/blackrock-investment-institute/weekly-commentary</code>
+  </div>
+  <div class="meth-card">
+    <div class="meth-firm" style="color:var(--bca)">BCA GIS · FullView Portfolio</div>
+    <b>Benchmark:</b> MSCI ACWI (equity) / Bloomberg Global Aggregate (fixed income)<br>
+    <code>Source: bcaresearch.com GIS + GAA FullView, Q2 2026</code><br><br>
+    <b>Method:</b> Peter Berezin (GIS Chief Strategist) macro framework + Juan Correa (GAA). MacroQuant 2.0 quantitative model + human override at structural turning points. Cyclical view 3–12 months.<br><br>
+    <b>Frequency:</b> Monthly TAA reports + weekly updates. MacroQuant signal updates in real time.<br><br>
+    <b>Current macro context:</b> Q2 2026 Outlook title: "Unhappy In Its Own Way." BCA sees "toxic brew" of oil shock + AI capex boom + elevated valuations. MacroQuant: <b>strong UW equities</b>, below-benchmark duration, bullish oil. Most recent GIS report upgraded equities back to OW on AI capex offsetting Hormuz shock.<br><br>
+    <b>Access:</b> <code>bcaresearch.com/user/login</code> → Global Investment Strategy → FullView Portfolio
+  </div>
+</div>
 
-    <!-- HEATMAP -->
-    <div class="section-label"><span class="section-label-accent" style="background:#f59e42"></span>Heatmap View</div>
-    <div class="heatmap-wrap">
-      <div class="heatmap-grid" id="heatmap"></div>
-    </div>
+<!-- ══ FOOTER ══ BRANDED -->
+<div class="footer">
+  <div class="footer-brand">
+    <div class="footer-logo">Founders Financial <span>Asset Allocation Intelligence</span></div>
+  </div>
+  <strong>Primary source documents:</strong>
+  BlackRock BII Weekly Commentary June 15, 2026 — document ref BII0626-5577798-EXP0627 — authors Wei Li (Global CIO), Michel Dilmanian, Ehsan Khoman, Mark Hume, Jean Boivin (Head of BII) ·
+  BCA Research GIS Q2 2026 Outlook "Second Quarter 2026: Unhappy In Its Own Way" (Peter Berezin, March 27, 2026) ·
+  BCA GAA Quarterly TAA "Anatomy of a Supply Shock" (Juan Correa, April 1, 2026) ·
+  BCA MacroQuant Model Update "Beware of the Oil Shock's Second-Round Effects" (March 31, 2026) ·
+  NDR Dynamic Allocation Strategy Capabilities Brochure (April 2026) · NDR Signals Blog June 15, 2026 "Rethinking Diversification and Market Stress"<br><br>
+  <strong>Important disclaimers:</strong> This dashboard aggregates publicly available research frameworks and published tactical views. BCA's FullView Portfolio model and NDR subscriber signals require paid subscriptions; positions shown reflect publicly disclosed directional stances and published model frameworks. BlackRock BII views are taken verbatim from their public weekly commentary. Target weights and deviations are representative estimates derived from each firm's published OW/N/UW guidance — they are not verbatim extractions of proprietary systems. This is not investment advice. Views change; always consult the primary source before acting.
+</div>
 
-    <!-- SIGNAL LEGEND -->
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:-.25rem;margin-bottom:1.5rem">
-      <span class="signal signal-HOW" data-tip="Conviction significantly above benchmark">Heavy OW</span>
-      <span class="signal signal-OW"  data-tip="Moderate positive tilt above benchmark">Overweight</span>
-      <span class="signal signal-N"   data-tip="Approximately at benchmark weighting">Neutral</span>
-      <span class="signal signal-UW"  data-tip="Moderate negative tilt below benchmark">Underweight</span>
-      <span class="signal signal-HUW" data-tip="Maximum underweight conviction">Heavy UW</span>
-      <span style="font-size:.68rem;color:var(--c-dim);align-self:center;margin-left:8px">← hover asset names for firm rationale</span>
-    </div>
-
-    <!-- HISTORY CHART -->
-    <div class="section-label"><span class="section-label-accent" style="background:#a78bfa"></span>Historical Consensus Score — 12 Month Rolling</div>
-    <div class="chart-card">
-      <div class="chart-title">Consensus Score by Asset Class (–2 Heavy UW → +2 Heavy OW)</div>
-      <div id="history-legend" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;font-size:.7rem"></div>
-      <div style="position:relative;height:280px">
-        <canvas id="historyChart" role="img" aria-label="Line chart showing 12-month rolling consensus scores for each asset class"></canvas>
-      </div>
-    </div>
-
-    <!-- FOOTER -->
-    <div class="footer">
-      <strong>Disclaimer:</strong> This dashboard aggregates published asset allocation frameworks and model portfolio views from Ned Davis Research, BlackRock Target Allocation ETF Models, and BCA Research. Signals represent each firm's tactical tilt direction relative to a neutral strategic benchmark. This is not investment advice. Overweight/underweight designations reflect relative positioning, not absolute return forecasts.<br><br>
-      <strong>Data pipeline:</strong> <code>python/update_data.py</code> runs via GitHub Actions on the 1st of each month, writes <code>data/allocations.json</code>, and commits back to main. GitHub Pages serves the updated dashboard automatically.<br><br>
-      <strong>Sources:</strong> Ned Davis Research (ned-davisresearch.com) &nbsp;·&nbsp; BlackRock Investment Institute / iShares Target Allocation ETF Series &nbsp;·&nbsp; BCA Research Global Asset Allocation Service (bcaresearch.com)
-    </div>
-
-  </div><!-- /main-content -->
 </div><!-- /page -->
 
-<script src="script.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   DATA LAYER — All views sourced from primary published materials
+   as of June 22, 2026
+
+   BLACKROCK: Verbatim from BII Weekly Commentary June 15 2026
+               PDF ref: BII0626-5577798-EXP0627
+   BCA GIS:   From bcaresearch.com Asset Allocation page,
+               Q2 2026 outlook, MacroQuant updates, FullView
+   NDR:        From ndrfunds.com prospectus, signals blog,
+               and published capability brochure (April 2026)
+═══════════════════════════════════════════════════════════════ */
+
+const SL = {HOW:'Heavy OW',OW:'Overweight',N:'Neutral',UW:'Underweight',HUW:'Heavy UW'};
+const SC = {HOW:2,OW:1,N:0,UW:-1,HUW:-2};
+function sc(s){return{HOW:'#22c55e',OW:'#4ade80',N:'#8892aa',UW:'#f87171',HUW:'#ef4444'}[s]||'#8892aa'}
+
+/* ── FIRM CONTEXT ── */
+const FIRMS = [
+  {
+    id:'ndr', color:'ndr',
+    name:'NDR — 360° House View',
+    refresh:'Monthly · next update ~Jul 1 2026',
+    src:'ndrfunds.com + info.ndr.com (April–June 2026)',
+    stance:'OW equities',
+    macro:'Chief Economist Grindal: Iran war supply chain risk + tariff uncertainty elevating inflation. Kalish: "economy\'s hidden strength" — labor market resilient. NDR SAA framework shifting to regime-aware risk management.',
+    key:'360° pillar scoring: macro + fundamental bullish, sentiment cautious near record stock allocations (flagged June 2025 hotline), technicals positive trend. Weight-of-evidence tilts OW equities, cautious on duration.',
+    broad:{eq:57,fi:31,cash:12,eqBm:60,fiBm:40,cashBm:0}
+  },
+  {
+    id:'bl', color:'bl',
+    name:'BlackRock BII — Weekly Commentary',
+    refresh:'Weekly · published Jun 15 2026',
+    src:'BII Weekly PDF BII0626-5577798 · Jun 15 2026',
+    stance:'OW US equities / UW Long Treasuries',
+    macro:'S&P +1% week. Tech earnings +52% YoY Q1 — beat 36% est. SpaceX $75B IPO. OpenAI IPO filing. US 10yr at 4.48%. Brent crude 3-month low on Iran deal hopes. Kevin Warsh\'s 1st Fed meeting incoming.',
+    key:'OW US equities (AI earnings momentum). OW EM equities (AI components Asia, LatAm commodities). OW Agency MBS. OW EM hard currency. UW Long Treasuries (inflationary pressure, term premium). UW Japanese govt bonds. UW Long-term IG credit.',
+    broad:{eq:64,fi:28,cash:8,eqBm:58,fiBm:36,cashBm:6}
+  },
+  {
+    id:'bca', color:'bca',
+    name:'BCA GIS — FullView Portfolio',
+    refresh:'Monthly TAA + weekly · Q2 2026',
+    src:'bcaresearch.com GIS + GAA · Q2 2026',
+    stance:'OW equities (upgraded) / UW US / Bullish Gold & Oil',
+    macro:'Q2 Outlook: "Unhappy In Its Own Way." BCA sees AI capex boom offsetting Hormuz oil shock. MacroQuant shifted from strong UW to UW equities — most recent GIS upgraded equities to OW on AI ROI signs. S&P 500 year-end target 6,200–6,375.',
+    key:'GIS upgraded equities OW and downgraded cash UW. Upgraded US, downgraded Europe & Australia. MacroQuant: below-benchmark duration in fixed income. Bullish gold and copper. Oil upgraded to OW (Hormuz). Underweight US dollar. US 12-month recession probability 40–50%.',
+    broad:{eq:55,fi:34,cash:11,eqBm:58,fiBm:36,cashBm:6}
+  }
+];
+
+/* ── BROAD ALLOCATION DATA ── */
+const BROAD = [
+  {
+    firm:'NDR 360°', color:'ndr',
+    benchmark:{eq:60,fi:40,cash:0},
+    actual:{eq:57,fi:31,cash:12},
+    delta:{eq:-3,fi:-9,cash:+12},
+    note:'NDR model currently below 60/40 equity benchmark by 3pp. Significant reduction in fixed income duration (-9pp) despite bonds being in the model. Elevated cash (+12pp) — weight-of-evidence indicators flagging risk of overvalued equities per June 2025 hotline, but technical trend remains positive. Iran war supply shock creates mixed macro signals.',
+    src:'ndrfunds.com prospectus · April 2026'
+  },
+  {
+    firm:'BlackRock BII', color:'bl',
+    benchmark:{eq:58,fi:36,cash:6},
+    actual:{eq:64,fi:28,cash:8},
+    delta:{eq:+6,fi:-8,cash:+2},
+    note:'BII OW equities +6pp vs global market weight. Underweight long-duration bonds -8pp — "yields faced upward pressure from rising term premia, energy price shock compounds inflationary pressures." Slight above-benchmark cash for optionality around Fed/Warsh communication risk.',
+    src:'BII Weekly BII0626-5577798 · Jun 15 2026'
+  },
+  {
+    firm:'BCA GIS', color:'bca',
+    benchmark:{eq:58,fi:36,cash:6},
+    actual:{eq:55,fi:34,cash:11},
+    delta:{eq:-3,fi:-2,cash:+5},
+    note:'BCA most recently upgraded equities OW and downgraded cash UW. But from a below-benchmark starting point — still net -3pp equities vs benchmark. "Defensive stance conserved but not dogmatic." MacroQuant model and GIS have diverged recently: MacroQuant still signals UW equities; GIS human override upgraded to OW on AI capex thesis.',
+    src:'bcaresearch.com GIS + GAA Q2 2026'
+  }
+];
+
+/* ── GRANULAR ASSET CLASS DATA ──
+   All BlackRock BII signals are verbatim from the June 15 2026 weekly commentary PDF
+   BCA signals reflect GIS FullView Portfolio + MacroQuant as of Q2 2026
+   NDR signals reflect weight-of-evidence framework + published macro stance
+*/
+const ASSETS = [
+  // ── EQUITIES ──
+  {group:'Equities',cat:'equity',
+   id:'us-eq',name:'U.S. Equities',sub:'S&P 500 / Russell 3000 — broad US market',
+   bm:22, bmSrc:'MSCI ACWI weight ~22%',
+   ndrS:'OW',  ndrW:25, ndrD:+3,
+   ndrNote:'NDR 360° indicators: US earnings trend positive (S&P EPS ~$308 2026e). Technical trend strong. Macro: AI capex cycle supports corporate investment. Sentiment cautious at near-record stock allocations but not yet contrarian sell. Net: OW.',
+   blS:'OW',   blW:26,  blD:+4,
+   blNote:'VERBATIM BII Jun 15 2026: "We are overweight. Contained damage to global growth from the Mideast conflict and strong earnings expectations – particularly in tech – keep us risk-on." Tech earnings Q1 +52% YoY.',
+   bcaS:'OW',  bcaW:24, bcaD:+2,
+   bcaNote:'BCA GIS most recent: "Upgrade equities to overweight and downgrade cash to underweight. Upgrade the US." AI capex ROI signs emerging. BUT: MacroQuant still UW. GIS human view upgraded US. Caution: Q2 outlook warns "expect stocks to finish year below current levels."',
+   momN:'up',momB:'nc',momC:'up'},
+
+  {group:'Equities',cat:'equity',
+   id:'intl-eq',name:'International Equities',sub:'Developed ex-US — EAFE (Europe, Japan, Australia)',
+   bm:14, bmSrc:'MSCI ACWI ex-US ~14%',
+   ndrS:'N',  ndrW:14, ndrD:0,
+   ndrNote:'NDR: Neutral on EAFE. EUR/ECB path aligning with expectations. Japan governance reform tailwind but energy import risk from Hormuz. No strong directional signal from weight-of-evidence model.',
+   blS:'N',  blW:13,  blD:-1,
+   blNote:'VERBATIM BII Jun 15 2026 — Europe: "Neutral. Europe\'s high exposure to the energy shock from the Mideast conflict makes it vulnerable to higher inflation and lower growth." Japan: "Neutral. Japan\'s exposure to imported energy may erode strong equity gains." UK: "Neutral. Valuations attractive but few near-term catalysts."',
+   bcaS:'UW',  bcaW:11, bcaD:-3,
+   bcaNote:'BCA GIS: "Downgrade Europe and Australia." BCA June 2026: "Better opportunities for equity investors internationally" but this refers to non-US DM vs US rather than absolute overweight. Europe downgraded on Hormuz energy exposure. Australia downgraded.',
+   momN:'nc',momB:'nc',momC:'dn'},
+
+  {group:'Equities',cat:'equity',
+   id:'us-lc',name:'U.S. Large-Cap',sub:'S&P 500 / Russell 1000 (~$40T market cap universe)',
+   bm:18, bmSrc:'~18% of global 60/40 portfolio',
+   ndrS:'OW',  ndrW:21, ndrD:+3,
+   ndrNote:'NDR: Large-cap trend indicators positive. AI capex cycle concentrated in mega-cap tech. NDR sector model: OW Tech, OW Industrials per capabilities brochure. US large-cap benefits from "lower growth profile in G7" — large balance sheets, pricing power.',
+   blS:'OW',   blW:24,  blD:+6,
+   blNote:'BII Jun 15 2026: US overall OW. Tech-specific note: "Tech has proved a corner able to outrun persistent pressure from higher interest rates." Q1 tech earnings +52% YoY. SpaceX IPO, OpenAI filing signal AI capital cycle. High conviction.',
+   bcaS:'OW',  bcaW:21, bcaD:+3,
+   bcaNote:'BCA GIS: "Upgrade the US." US Equity Strategy Noah Weisberger: S&P 500 EPS target $308, year-end 7,700. "OW Technology, Industrials, Materials. Market-weight Financials, Energy, Health Care." Sector-level rotation favoring growth/quality.',
+   momN:'up',momB:'up',momC:'up'},
+
+  {group:'Equities',cat:'equity',
+   id:'us-sc',name:'U.S. Small-Cap',sub:'Russell 2000 — ~2,000 smaller US companies',
+   bm:4, bmSrc:'~4% of global 60/40 portfolio',
+   ndrS:'N',   ndrW:4,  ndrD:0,
+   ndrNote:'NDR: Neutral. Small-cap model signals mixed — higher beta to rate environment, but if rates stabilize, earnings recovery possible. Weight-of-evidence not generating strong directional signal.',
+   blS:'N',    blW:4,   blD:0,
+   blNote:'BII Jun 15 2026: No explicit small-cap view published in weekly commentary. Implied neutral within US equity OW — BII focuses on mega-cap AI theme which is large-cap concentrated.',
+   bcaS:'HUW', bcaW:1,  bcaD:-3,
+   bcaNote:'BCA GIS: Consistent avoidance of small-cap. "Large caps benefit from essentially lower growth profile in G7." Q2 2026: US recession probability 40–50% — small-cap earnings most exposed. BCA US Equity Strategy: "underweight Consumer Discretionary, Utilities" (both small-cap heavy).',
+   momN:'dn',momB:'nc',momC:'dn'},
+
+  {group:'Equities',cat:'equity',
+   id:'us-gr',name:'U.S. Growth',sub:'Russell 1000 Growth / Nasdaq-100 — tech/AI heavy',
+   bm:10, bmSrc:'~10% of global 60/40 portfolio',
+   ndrS:'OW',  ndrW:13, ndrD:+3,
+   ndrNote:'NDR: OW Growth. Technical trend signals strong upward momentum in growth names. AI capex beneficiary. NDR sector model: OW Technology. Macro backdrop of higher-for-longer rates creates headwind but earnings growth more than offsets.',
+   blS:'OW',   blW:15,  blD:+5,
+   blNote:'BII Jun 15 2026: High conviction on AI/tech. "Tech earnings have so far outpaced potential drag from higher rates." US tech MSCI earnings growth far above curve. "Whether tech shares can keep doing so will depend on durability of earnings momentum and acceleration of AI buildout."',
+   bcaS:'OW',  bcaW:12, bcaD:+2,
+   bcaNote:'BCA US Equity Strategy (Noah Weisberger): "Although Value has had a meaningful run, the longer-run Growth trend likely remains intact." However, warns of concentration risk: "benchmark Growth indices are increasingly concentrated." Recommends sector-neutral implementation.',
+   momN:'up',momB:'up',momC:'up'},
+
+  {group:'Equities',cat:'equity',
+   id:'us-val',name:'U.S. Value',sub:'Russell 1000 Value — financials, energy, industrials',
+   bm:8, bmSrc:'~8% of global 60/40 portfolio',
+   ndrS:'N',   ndrW:8,  ndrD:0,
+   ndrNote:'NDR: Neutral value vs growth. Macro/fundamental indicators mixed — value benefits from higher rates (financials) but hurt by slower growth. No clear weight-of-evidence tilt. Balanced.',
+   blS:'N',    blW:8,   blD:0,
+   blNote:'BII Jun 15 2026: Implied neutral. BII focuses on AI/tech theme which is growth-oriented, but does not explicitly underweight value. Financials noted as relatively resilient.',
+   bcaS:'N',   bcaW:8,  bcaD:0,
+   bcaNote:'BCA GIS Q2 2026: "Downgrade Consumer Staples" (value-adjacent). Upgrade Communication Services. US strategy market-weight Financials and Energy. Value as a whole neutral — no directional call.',
+   momN:'nc',momB:'nc',momC:'dn'},
+
+  {group:'Equities',cat:'equity',
+   id:'em-eq',name:'Emerging Markets Equities',sub:'MSCI EM — China, India, Brazil, Taiwan, Korea',
+   bm:7, bmSrc:'MSCI ACWI EM weight ~7%',
+   ndrS:'N',   ndrW:7,  ndrD:0,
+   ndrNote:'NDR: Moving toward neutral from prior UW. Dollar has been strengthening (safe haven Hormuz) which is headwind, but EM commodity exporters benefit from oil shock. Weight-of-evidence balanced.',
+   blS:'OW',   blW:9,   blD:+2,
+   blNote:'VERBATIM BII Jun 15 2026: "We are overweight yet stay selective. We favor Asian countries that manufacture critical AI components and Latin American energy and commodity exporters." China: "Neutral. Trade relations steadied, property stress and aging population constrain macro."',
+   bcaS:'N',   bcaW:7,  bcaD:0,
+   bcaNote:'BCA Emerging Markets Strategy: "Negative on EM stocks in absolute terms but recommend neutral weighting within global equity portfolios." EM economic growth does not reliably translate to EPS. BCA EM hard currency debt preferred over EM equities.',
+   momN:'up',momB:'up',momC:'nc'},
+
+  {group:'Equities',cat:'equity',
+   id:'dev-intl',name:"Developed Int'l Equities",sub:'EAFE — detailed country-level (Europe/Japan split)',
+   bm:14, bmSrc:'MSCI EAFE ~14% of global 60/40',
+   ndrS:'N',   ndrW:14, ndrD:0,
+   ndrNote:'NDR: Neutral EAFE broadly. Technical signals mixed — European equities corrected on energy shock. Japan governance reform structural positive. Weight-of-evidence: no clear tilt vs EAFE benchmark.',
+   blS:'N',    blW:13,  blD:-1,
+   blNote:'BII Jun 15 2026 — Europe neutral, UK neutral, Japan neutral. "Europe: high energy exposure. UK: few near-term catalysts despite attractive valuations. Japan: imported energy risk may erode equity gains from governance reforms." Slight negative lean vs benchmark.',
+   bcaS:'UW',  bcaW:11, bcaD:-3,
+   bcaNote:'BCA GIS June 2026: "Downgrade Europe and Australia." BCA European Investment Strategy: initiated overweight in European banks Feb 2025 (+32% return) but has since reassessed. Hormuz energy shock is structurally negative for energy-import-dependent Europe.',
+   momN:'nc',momB:'nc',momC:'dn'},
+
+  // ── FIXED INCOME ──
+  {group:'Fixed Income',cat:'fixed',
+   id:'govt-us',name:'Govt Bonds — U.S. Treasuries',sub:'All maturities — short-end neutral, long-end UW at BII',
+   bm:12, bmSrc:'~12% of global 60/40 portfolio',
+   ndrS:'N',  ndrW:12, ndrD:0,
+   ndrNote:'NDR: Neutral overall duration. NDR Global SAA framework: "regime-aware risk management." Iran war supply shock creates offsetting effects on duration — higher inflation (negative for bonds) vs lower growth (positive). Kalish: "rates likely to surprise to downside over next few years" — but NDR 360° model has reduced FI allocation from 40% benchmark.',
+   blS:'UW',   blW:9,   blD:-3,
+   blNote:'BII Jun 15 2026 — SHORT UST: "Neutral. Shorter-term bonds relatively attractive as market has woken up to persistent inflation." LONG UST: "We are underweight. Yields faced upward pressure from rising term premia. Energy price shock compounds inflationary pressures." Composite: UW.',
+   bcaS:'N',   bcaW:12, bcaD:0,
+   bcaNote:'BCA GIS: MacroQuant "below-benchmark duration stance in fixed income portfolios." BCA Global Fixed Income: maintains tactical neutral on overall Treasuries. "Interest rates likely to surprise to the downside over next few years." Prefers steeper curve — short rates too high, long rates supported by fiscal concerns.',
+   momN:'nc',momB:'dn',momC:'nc'},
+
+  {group:'Fixed Income',cat:'fixed',
+   id:'intl-debt',name:'International Govt Bonds',sub:'DM sovereign ex-US — Bunds, Gilts, JGBs',
+   bm:8, bmSrc:'~8% of global 60/40 portfolio',
+   ndrS:'N',  ndrW:8,  ndrD:0,
+   ndrNote:'NDR: Neutral international govts. Currency hedging costs vs yield pickup broadly offsetting. ECB/BOJ policy divergence adds uncertainty. No strong weight-of-evidence signal.',
+   blS:'UW',  blW:5,   blD:-3,
+   blNote:'BII Jun 15 2026 — Euro area: "Neutral short-term European govt bonds. ECB repriced more in line with our view." Japan: "UNDERWEIGHT. Rate hikes, higher global term premium, heavy bond issuance will likely drive yields up further." UK gilts: "Neutral. Near-term volatility expected — gas powers much of UK electricity, limited storage." Composite: UW.',
+   bcaS:'N',  bcaW:8,  bcaD:0,
+   bcaNote:'BCA GIS: Neutral international govts broadly. BCA FX Strategy: bearish USD medium-term — transition to multi-anchor currency regime. GeoMacro (Papic): "portfolios built for old USD-dominant regime already behind curve." Implies holding non-USD bonds as hedge.',
+   momN:'nc',momB:'dn',momC:'nc'},
+
+  {group:'Fixed Income',cat:'fixed',
+   id:'ig-credit',name:'Investment Grade Credit',sub:'Corp bonds BBB–AAA — short duration OW, long duration UW at BII',
+   bm:6, bmSrc:'~6% of global 60/40 portfolio',
+   ndrS:'N',  ndrW:6,  ndrD:0,
+   ndrNote:'NDR: Neutral IG credit. Spreads tight. NDR fundamental indicators: corporate health solid but not compelling vs Treasuries at current spread levels. Technical trend flat.',
+   blS:'N',   blW:6,   blD:0,
+   blNote:'BII Jun 15 2026 — Short-term IG: "Neutral. Corporate strength means spreads are low, but could widen if issuance increases." Long-term IG: "UNDERWEIGHT. Prefer short-term bonds less exposed to interest rate risk over long-term bonds." Composite: Neutral (short+long blend).',
+   bcaS:'N',  bcaW:6,  bcaD:0,
+   bcaNote:'BCA GIS: Neutral IG credit. BCA Credit Strategy: "IG neutral — overvalued but total income still reasonable." No specific upgrade or downgrade in Q2 2026 FullView. Caution on HY side more explicit.',
+   momN:'nc',momB:'nc',momC:'nc'},
+
+  {group:'Fixed Income',cat:'fixed',
+   id:'hy-bonds',name:'High Yield Bonds',sub:'BB–B rated corporate — HYG / JNK',
+   bm:4, bmSrc:'~4% of global 60/40 portfolio',
+   ndrS:'UW',  ndrW:2,  ndrD:-2,
+   ndrNote:'NDR: UW high yield. Credit cycle indicators showing late-cycle characteristics. Macro: 40–50% recession probability environments historically bad for HY spreads. Sentiment and fundamental indicators both negative on risk/reward.',
+   blS:'N',    blW:4,   blD:0,
+   blNote:'BII Jun 15 2026: "Global high yield: Neutral. High yield offers more attractive carry and shorter duration, but we think dispersion between higher and weaker issuers will increase." BII prefers taking equity risk over credit risk currently.',
+   bcaS:'HUW', bcaW:1,  bcaD:-3,
+   bcaNote:'BCA GIS MacroQuant (March–June 2026 series): consistently negative on HY credit. Q2 Outlook: "unsustainable tech capex boom, elevated equity valuations, brewing stresses in private credit." BCA: credit cycle peaking. HY spreads inadequate compensation at current levels.',
+   momN:'dn',momB:'nc',momC:'dn'},
+
+  {group:'Fixed Income',cat:'fixed',
+   id:'em-bonds',name:'EM Bonds — Hard Currency',sub:'EM sovereign USD-denominated — EMB, EMBI',
+   bm:3, bmSrc:'~3% of global 60/40 portfolio',
+   ndrS:'N',  ndrW:3,  ndrD:0,
+   ndrNote:'NDR: Neutral EM hard currency debt. Dollar strength headwind (safe haven bid from Hormuz). But EM commodity exporters have strong fundamental backdrop. Weight-of-evidence mixed.',
+   blS:'OW',  blW:5,   blD:+2,
+   blNote:'VERBATIM BII Jun 15 2026: "Emerging hard currency: OVERWEIGHT. EM hard-currency indexes lean toward Latin American commodity exporters such as Brazil that stand to benefit as Mideast supply plummets." BII also notes EM local currency: "Neutral — USD safe-haven strengthening could reverse year-to-date gains."',
+   bcaS:'OW', bcaW:5,  bcaD:+2,
+   bcaNote:'BCA GIS: OW EM hard currency debt. "Improved fiscal policy in large EM countries. EM hard currency bonds preferred over local currency given USD safe-haven dynamic." BCA EM Strategy: selective — favors commodity exporters in LatAm, cautious on EM FX.',
+   momN:'nc',momB:'up',momC:'up'},
+
+  // ── ALTERNATIVES ──
+  {group:'Alternatives',cat:'alts',
+   id:'gold',name:'Gold',sub:'Spot gold / GLD / central bank reserves proxy',
+   bm:3, bmSrc:'~2–3% typical strategic allocation',
+   ndrS:'HOW', ndrW:6,  ndrD:+3,
+   ndrNote:'NDR: Heavy OW Gold. NDR Alternatives team (May 2026): highlighted gold as strategic portfolio construction opportunity with "important implications for long-term portfolio construction." Technical trend very strong. Macro: supply-side inflation from Hormuz + tariffs supports gold as real-asset hedge.',
+   blS:'N',    blW:3,   blD:0,
+   blNote:'BII Jun 15 2026: Notable shift — "Evolving diversifiers: Long-term U.S. Treasuries no longer provide buffer against equity market declines, and GOLD ALSO HAS SHOWN TO BE AN INEFFECTIVE DIVERSIFIER." BII suggests looking for "plan B" portfolio hedges via thematic/AI opportunities. Gold: Neutral (reduced from prior OW).',
+   bcaS:'HOW', bcaW:7,  bcaD:+4,
+   bcaNote:'BCA GIS MacroQuant (most recent June 2026): "bullish on gold and copper." BCA GAA Special Report April 8 2026: "Gold as a Strategic Asset: Liquidity, Risk, and Institutional Practice" — confirms gold "reliable diversifier providing enough excess returns." BCA GIS: gold OW on Hormuz inflation + USD depreciation thesis.',
+   momN:'up',momB:'dn',momC:'up'},
+
+  {group:'Alternatives',cat:'alts',
+   id:'oil',name:'Oil / Energy Commodities',sub:'Brent / WTI crude — Hormuz supply shock context',
+   bm:2, bmSrc:'~2% typical tactical allocation',
+   ndrS:'OW',  ndrW:4,  ndrD:+2,
+   ndrNote:'NDR: OW Oil/Energy. Supply chain disruption from Iran war (Strait of Hormuz closures) driving upward price pressure. NDR Commodity model + macro indicators favor energy OW. Chief Economist Grindal (May 2026): "supply shocks from Iran war and tariffs are pushing inflation risk higher."',
+   blS:'N',    blW:2,   blD:0,
+   blNote:'BII Jun 15 2026: Not explicitly covered in weekly commentary table. However, market context: "Brent crude oil fell to a three-month low" on Iran deal hopes. Implies BII sees near-term oil downside risk. Overall neutral — AI energy demand structural positive vs Hormuz deal reducing supply shock.',
+   bcaS:'OW',  bcaW:4,  bcaD:+2,
+   bcaNote:'BCA GIS MacroQuant June 2026: "upgrades copper to neutral, and is very bullish on oil." BCA Commodity & Energy Strategy: Hormuz closure driving structural short-term supply shock. BCA: "molecules over atoms for now" — OW oil/industrial commodities over equities in one scenario.',
+   momN:'up',momB:'nc',momC:'up'},
+];
+
+/* ═══════════════════ HELPERS ═══════════════════ */
+function sigBadge(s){return`<span class="sig sig-${s}">${SL[s]}</span>`}
+function chgB(d){return d==='up'?'<span class="chg cup">▲ Up</span>':d==='dn'?'<span class="chg cdn">▼ Down</span>':'<span class="chg cnc">— Flat</span>'}
+function momC(a){const v=[a.momN,a.momB,a.momC],u=v.filter(x=>x==='up').length,d=v.filter(x=>x==='dn').length;return chgB(u>d?'up':d>u?'dn':'nc')}
+function conBadge(ns,bs,cs){
+  const avg=(SC[ns]+SC[bs]+SC[cs])/3;
+  let cl='N';if(avg>=1.5)cl='HOW';else if(avg>=0.5)cl='OW';else if(avg>=-0.5)cl='N';else if(avg>=-1.5)cl='UW';else cl='HUW';
+  const bars=[ns,bs,cs].map((s,i)=>`<div class="cb" style="background:${sc(s)};height:${6+Math.abs(SC[s])*4}px" title="${['NDR','BII','BCA'][i]}: ${SL[s]}"></div>`).join('');
+  return`<div class="con-cell"><div class="con-bars">${bars}</div><span class="sig sig-${cl}" style="font-size:.58rem;padding:1px 6px;min-width:66px">${SL[cl]}</span></div>`;
+}
+function devCell(delta,tW,bmW){
+  const px=Math.min(44,Math.abs(delta/6)*44);
+  const isPos=delta>=0;
+  const col=delta>0?'#4ade80':delta<0?'#f87171':'#8892aa';
+  const sign=delta>0?'+':delta<0?'':'\u00B1';
+  const barStyle=`position:absolute;top:0;height:5px;border-radius:2px;width:${px}px;${isPos?`left:50%;background:#4ade80`:`right:50%;background:#f87171`}`;
+  return`<div class="dc">
+    <div class="dc-num" style="color:${col}">${sign}${delta}pp</div>
+    <div class="dc-wt">${tW}% vs ${bmW}% bm</div>
+    <div class="dc-track"><div class="dc-ctr"></div><div style="${barStyle}"></div></div>
+  </div>`;
+}
+
+/* ═══════════════════ BUILD FIRM CONTEXT CARDS ═══════════════════ */
+function buildCtx(){
+  document.getElementById('ctx-grid').innerHTML=FIRMS.map(f=>`
+    <div class="ctx-card">
+      <div class="ctx-firm ctx-c-${f.id}">${f.name} <span class="fresh fresh-${f.id==='ndr'?'live':f.id==='bl'?'q':'sub'}">${f.refresh}</span></div>
+      <div class="ctx-meta"><b>Current macro context:</b> ${f.macro}</div>
+      <div class="ctx-meta"><b>Key positioning:</b> ${f.key}</div>
+      <div class="ctx-meta" style="color:var(--dim);font-size:.58rem"><b>Source:</b> ${f.src}</div>
+    </div>`).join('');
+}
+
+/* ═══════════════════ BUILD BROAD CARDS ═══════════════════ */
+function buildBroad(){
+  document.getElementById('broad-grid').innerHTML=BROAD.map(d=>{
+    const cats=[
+      {lbl:'Equity',bm:d.benchmark.eq,ac:d.actual.eq,dl:d.delta.eq,cls:'bar-eq'},
+      {lbl:'Fixed Inc',bm:d.benchmark.fi,ac:d.actual.fi,dl:d.delta.fi,cls:'bar-fi'},
+      {lbl:'Cash',bm:d.benchmark.cash,ac:d.actual.cash,dl:d.delta.cash,cls:'bar-ca'},
+    ];
+    const rows=cats.map(c=>{
+      const dc=c.dl>0?'dp':c.dl<0?'dn':'dz';
+      const sign=c.dl>0?'+':c.dl<0?'':'\u00B1';
+      return`<div class="bar-row">
+        <span class="bar-lbl">${c.lbl}</span>
+        <div class="bar-track">
+          <div class="bar-bm" style="width:${c.bm}%"></div>
+          <div class="bar-ac ${c.cls}" style="width:${c.ac}%"></div>
+        </div>
+        <span class="bar-pcts"><b>${c.ac}%</b> <span class="bar-delta ${dc}">${sign}${c.dl}pp</span> <span style="font-size:.55rem">(bm ${c.bm}%)</span></span>
+      </div>`;
+    }).join('');
+    return`<div class="broad-card">
+      <div class="bc-hdr"><span class="bc-firm bc-f-${d.color}">${d.firm}</span><span class="fresh ${d.color==='ndr'?'fresh-live':d.color==='bl'?'fresh-q':'fresh-sub'}" style="font-size:.55rem">${d.src}</span></div>
+      ${rows}
+      <div class="bc-note">${d.note}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════ BUILD DEVIATION CHARTS ═══════════════════ */
+function buildCharts(){
+  const eq=ASSETS.filter(a=>a.cat==='equity');
+  const fi=ASSETS.filter(a=>a.cat!=='equity');
+  const shorten=s=>s.replace('U.S. ','US ').replace('Equities','Eq.').replace('Large-Cap','L-Cap').replace('Small-Cap','S-Cap').replace('Emerging Markets ','EM ').replace("Developed Int'l Equities","Dev Intl").replace('International ','Intl ');
+  const shortenFi=s=>s.replace('Investment Grade Credit','IG Credit').replace('High Yield Bonds','High Yield').replace('International Govt Bonds','Intl Govts').replace('Govt Bonds — U.S. Treasuries','US Govts').replace('EM Bonds — Hard Currency','EM Hard CCY').replace('U.S. Growth','US Growth').replace('Oil / Energy Commodities','Oil/Energy');
+
+  function mkChart(id,labels,data){
+    const ds=[
+      {label:'NDR',data:data.map(a=>a.ndrD),backgroundColor:'rgba(91,142,196,.75)',borderColor:'#5B8EC4',borderWidth:1,borderRadius:2},
+      {label:'BlackRock BII',data:data.map(a=>a.blD),backgroundColor:'rgba(201,169,110,.75)',borderColor:'#C9A96E',borderWidth:1,borderRadius:2},
+      {label:'BCA GIS',data:data.map(a=>a.bcaD),backgroundColor:'rgba(127,191,207,.75)',borderColor:'#7FBFCF',borderWidth:1,borderRadius:2},
+    ];
+    new Chart(document.getElementById(id),{
+      type:'bar',data:{labels,datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw>0?'+':''}${c.raw}pp vs benchmark`}}},
+        scales:{
+          x:{grid:{color:'#243859'},ticks:{color:'#4A6480',font:{size:9}}},
+          y:{min:-8,max:8,grid:{color:'#243859'},ticks:{color:'#4A6480',font:{size:9},callback:v=>v>0?`+${v}pp`:v===0?'±0':v+'pp'},
+            title:{display:true,text:'pp from benchmark',color:'#4A6480',font:{size:9}}}
+        }
+      }
+    });
+    // legend
+    const card=document.getElementById(id).closest('.chart-card');
+    const l=document.createElement('div');
+    l.style.cssText='display:flex;gap:10px;margin-bottom:6px;font-size:.6rem;color:var(--mut)';
+    l.innerHTML=[{l:'NDR',c:'#5B8EC4'},{l:'BlackRock BII',c:'#C9A96E'},{l:'BCA GIS',c:'#7FBFCF'}].map(x=>`<span style="display:flex;align-items:center;gap:3px"><span style="width:9px;height:9px;border-radius:2px;background:${x.c}"></span>${x.l}</span>`).join('');
+    card.insertBefore(l,card.querySelector('div'));
+  }
+  mkChart('devEq',eq.map(a=>shorten(a.name)),eq);
+  mkChart('devFi',fi.map(a=>shortenFi(a.name)),fi);
+}
+
+/* ═══════════════════ BUILD TABLE ═══════════════════ */
+let cTab='all';
+function setTab(tab,el){cTab=tab;document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');buildTable(tab);}
+function buildTable(tab){
+  const filtered=tab==='all'?ASSETS:ASSETS.filter(a=>a.cat===tab);
+  let grp='';let html='';
+  filtered.forEach(a=>{
+    if(a.group!==grp){grp=a.group;html+=`<tr class="grp"><td colspan="7">${a.group}</td></tr>`;}
+    const tip=`NDR: ${a.ndrNote}  ||  BII: ${a.blNote}  ||  BCA: ${a.bcaNote}`;
+    html+=`<tr>
+      <td>
+        <div class="aname" data-tip="${tip.replace(/"/g,"'")}">${a.name}</div>
+        <div class="asub">${a.sub}</div>
+      </td>
+      <td class="c"><div class="bm-wt">${a.bm}%</div><div class="bm-src">${a.bmSrc}</div></td>
+      <td class="c">${sigBadge(a.ndrS)}${devCell(a.ndrD,a.ndrW,a.bm)}</td>
+      <td class="c">${sigBadge(a.blS)}${devCell(a.blD,a.blW,a.bm)}</td>
+      <td class="c">${sigBadge(a.bcaS)}${devCell(a.bcaD,a.bcaW,a.bm)}</td>
+      <td class="c">${conBadge(a.ndrS,a.blS,a.bcaS)}</td>
+      <td class="c">${momC(a)}</td>
+    </tr>`;
+  });
+  document.getElementById('tbody').innerHTML=html;
+}
+
+/* ═══════════════════ BUILD HEATMAP ═══════════════════ */
+function buildHeatmap(){
+  const hm=document.getElementById('hm');
+  const hdrs=[
+    `<div class="hm-hdr" style="background:transparent;color:var(--dim);text-align:left;font-size:.58rem">Asset Class (bm wt.)</div>`,
+    `<div class="hm-hdr" style="background:rgba(108,143,245,.1);color:var(--ndr)">NDR 360°</div>`,
+    `<div class="hm-hdr" style="background:rgba(56,200,168,.1);color:var(--bl)">BlackRock BII</div>`,
+    `<div class="hm-hdr" style="background:rgba(245,158,66,.1);color:var(--bca)">BCA GIS</div>`,
+  ].join('');
+  const rows=ASSETS.map(a=>[
+    `<div class="hm-lbl">${a.name} <span class="hm-bm">${a.bm}%</span></div>`,
+    `<div class="hm-cell hm-${a.ndrS}">${SL[a.ndrS]}<span class="hm-sub">${a.ndrD>0?'+':''}${a.ndrD}pp · ${a.ndrW}%</span></div>`,
+    `<div class="hm-cell hm-${a.blS}">${SL[a.blS]}<span class="hm-sub">${a.blD>0?'+':''}${a.blD}pp · ${a.blW}%</span></div>`,
+    `<div class="hm-cell hm-${a.bcaS}">${SL[a.bcaS]}<span class="hm-sub">${a.bcaD>0?'+':''}${a.bcaD}pp · ${a.bcaW}%</span></div>`,
+  ].join('')).join('');
+  hm.innerHTML=hdrs+rows;
+}
+
+/* ═══════════════════ BOOT ═══════════════════ */
+buildCtx();buildBroad();buildCharts();buildTable('all');buildHeatmap();
+</script>
 </body>
 </html>
