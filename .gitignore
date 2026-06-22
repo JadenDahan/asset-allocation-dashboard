@@ -1,0 +1,31 @@
+# ── Credentials — NEVER commit these ──
+.env
+.env.local
+secrets.json
+credentials.json
+*.key
+*.pem
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+dist/
+build/
+
+# ── OS / Editor ──
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+*.swp
+
+# ── Logs ──
+*.log
+logs/
+
+# ── Node (if you add a build step later) ──
+node_modules/

@@ -1,0 +1,16 @@
+# Asset Allocation Dashboard — Python dependencies
+# Install with:  pip install -r requirements.txt
+
+# HTTP requests + web session handling
+requests>=2.31.0
+
+# HTML parsing (web scrape fallback)
+beautifulsoup4>=4.12.0
+lxml>=5.1.0            # faster HTML parser for BeautifulSoup
+
+# PDF text extraction (BCA report PDFs)
+pymupdf>=1.23.0        # PyMuPDF — preferred, fast and reliable
+pdfminer.six>=20221105 # fallback if pymupdf unavailable
+
+# Data handling
+python-dateutil>=2.8.2

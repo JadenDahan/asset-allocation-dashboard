@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Asset Allocation Dashboard — NDR | BlackRock | BCA Research</title>
+<link rel="stylesheet" href="style.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════════════
+     TOPBAR
+═══════════════════════════════ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">Asset Allocation Dashboard <span>// Multi-Firm View</span></div>
+    <div class="topbar-meta">
+      Data as of <strong id="data-date">Loading…</strong>
+      &nbsp;·&nbsp; <span id="data-source-label">Loading data…</span>
+    </div>
+  </div>
+  <div class="legend-pills">
+    <div class="pill pill-ndr"><span class="pulse pulse-ndr"></span>Ned Davis Research</div>
+    <div class="pill pill-bl"><span class="pulse pulse-bl"></span>BlackRock Target Alloc.</div>
+    <div class="pill pill-bca"><span class="pulse pulse-bca"></span>BCA Research</div>
+    <div class="pill pill-refresh" onclick="refreshData()" title="Reload data from JSON">↻ Refresh</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════
+     MAIN PAGE
+═══════════════════════════════ -->
+<div class="page">
+
+  <!-- Loading / Error states -->
+  <div id="loading-state" class="state-box">
+    <div class="spinner"></div>
+    <p>Loading allocation data…</p>
+  </div>
+  <div id="error-state" class="state-box state-error" style="display:none">
+    <p id="error-msg">⚠ Could not load data/allocations.json</p>
+    <p style="font-size:.75rem;margin-top:.5rem;color:var(--c-muted)">
+      Run <code>python python/update_data.py</code> locally, or trigger the GitHub Action to generate data.
+    </p>
+  </div>
+
+  <!-- Dashboard content (shown after data loads) -->
+  <div id="main-content" style="display:none">
+
+    <!-- BROAD ALLOCATION -->
+    <div class="section-label"><span class="section-label-accent" style="background:#6c8ff5"></span>Broad Asset Allocation — Equity / Debt / Cash</div>
+    <div class="broad-grid" id="broad-grid"></div>
+
+    <!-- BROAD CHART -->
+    <div class="chart-card" style="margin-bottom:1.5rem">
+      <div class="chart-title">Broad Allocation Comparison</div>
+      <div style="position:relative;height:220px">
+        <canvas id="broadChart" role="img" aria-label="Grouped bar chart comparing broad equity, debt, and cash allocations across NDR, BlackRock, and BCA Research"></canvas>
+      </div>
+    </div>
+
+    <!-- GRANULAR TABLE -->
+    <div class="section-label"><span class="section-label-accent" style="background:#38c8a8"></span>Granular Asset Class Views</div>
+    <div class="tab-nav">
+      <button class="tab active" onclick="setTab('all',this)">All Classes</button>
+      <button class="tab" onclick="setTab('equity',this)">Equities</button>
+      <button class="tab" onclick="setTab('fixed',this)">Fixed Income</button>
+      <button class="tab" onclick="setTab('alternatives',this)">Alternatives</button>
+    </div>
+    <div class="asset-table-wrap">
+      <table class="asset-table" id="main-table" aria-label="Asset allocation views by firm and asset class">
+        <thead>
+          <tr>
+            <th style="width:220px">Asset Class</th>
+            <th class="center" style="color:var(--c-ndr)">NDR</th>
+            <th class="center" style="color:var(--c-bl)">BlackRock</th>
+            <th class="center" style="color:var(--c-bca)">BCA Research</th>
+            <th class="center">Consensus</th>
+            <th class="center">MoM Change</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+    <!-- HEATMAP -->
+    <div class="section-label"><span class="section-label-accent" style="background:#f59e42"></span>Heatmap View</div>
+    <div class="heatmap-wrap">
+      <div class="heatmap-grid" id="heatmap"></div>
+    </div>
+
+    <!-- SIGNAL LEGEND -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:-.25rem;margin-bottom:1.5rem">
+      <span class="signal signal-HOW" data-tip="Conviction significantly above benchmark">Heavy OW</span>
+      <span class="signal signal-OW"  data-tip="Moderate positive tilt above benchmark">Overweight</span>
+      <span class="signal signal-N"   data-tip="Approximately at benchmark weighting">Neutral</span>
+      <span class="signal signal-UW"  data-tip="Moderate negative tilt below benchmark">Underweight</span>
+      <span class="signal signal-HUW" data-tip="Maximum underweight conviction">Heavy UW</span>
+      <span style="font-size:.68rem;color:var(--c-dim);align-self:center;margin-left:8px">← hover asset names for firm rationale</span>
+    </div>
+
+    <!-- HISTORY CHART -->
+    <div class="section-label"><span class="section-label-accent" style="background:#a78bfa"></span>Historical Consensus Score — 12 Month Rolling</div>
+    <div class="chart-card">
+      <div class="chart-title">Consensus Score by Asset Class (–2 Heavy UW → +2 Heavy OW)</div>
+      <div id="history-legend" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;font-size:.7rem"></div>
+      <div style="position:relative;height:280px">
+        <canvas id="historyChart" role="img" aria-label="Line chart showing 12-month rolling consensus scores for each asset class"></canvas>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <strong>Disclaimer:</strong> This dashboard aggregates published asset allocation frameworks and model portfolio views from Ned Davis Research, BlackRock Target Allocation ETF Models, and BCA Research. Signals represent each firm's tactical tilt direction relative to a neutral strategic benchmark. This is not investment advice. Overweight/underweight designations reflect relative positioning, not absolute return forecasts.<br><br>
+      <strong>Data pipeline:</strong> <code>python/update_data.py</code> runs via GitHub Actions on the 1st of each month, writes <code>data/allocations.json</code>, and commits back to main. GitHub Pages serves the updated dashboard automatically.<br><br>
+      <strong>Sources:</strong> Ned Davis Research (ned-davisresearch.com) &nbsp;·&nbsp; BlackRock Investment Institute / iShares Target Allocation ETF Series &nbsp;·&nbsp; BCA Research Global Asset Allocation Service (bcaresearch.com)
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /page -->
+
+<script src="script.js"></script>
+</body>
+</html>
