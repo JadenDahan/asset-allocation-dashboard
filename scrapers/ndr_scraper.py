@@ -1,236 +1,354 @@
 """
 scrapers/ndr_scraper.py
-=======================
-Ned Davis Research — asset allocation signal extractor.
+========================
+Ned Davis Research — House Views scraper.
 
-Authentication flow (tries in order):
-  1. REST API  →  POST /auth/token  →  GET /allocations/tactical
-  2. Web session login (requests-html or requests + BeautifulSoup)
-     if the REST API returns 404 / is not provisioned for your subscription tier.
+Logs into ndr.com using NDR_USER and NDR_PASS environment variables
+(stored as GitHub Secrets), navigates to the Model Portfolios /
+Dynamic Allocation Strategy page, and extracts current signals.
 
-Set env vars:
-  NDR_USER     your NDR username / client ID
-  NDR_PASS     your NDR password or API key
-  NDR_API_URL  base URL (default: https://api.ndr.com/v2)
+NDR's portal is JavaScript-rendered so we use Playwright (headless
+Chromium) which GitHub Actions supports natively.
+
+Returns a dict that update_data.py writes into allocations.json.
 """
 
 import os
 import re
 import json
 import logging
-import requests
-from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-NDR_API_URL  = os.environ.get("NDR_API_URL",  "https://api.ndr.com/v2")
-NDR_WEB_URL  = os.environ.get("NDR_WEB_URL",  "https://www.ndr.com")
-NDR_USER     = os.environ.get("NDR_USER", "")
-NDR_PASS     = os.environ.get("NDR_PASS", "")
+# ── Credentials come from GitHub Secrets ──
+NDR_USER = os.environ.get("NDR_USER", "")
+NDR_PASS = os.environ.get("NDR_PASS", "")
 
-# Map NDR's internal asset class labels to our canonical IDs
-# !! Update these keys to match what the NDR API/site actually returns !!
+# ── NDR portal URLs ──
+NDR_LOGIN     = "https://www.ndr.com/group/ndr"
+NDR_PORTFOLIO = "https://www.ndr.com/hs/model-portfolios"
+NDR_SIGNALS   = "https://info.ndr.com/ndr-signals"
+
+# ── Asset label → canonical ID mapping ──
 NDR_ASSET_MAP = {
-    "US Equities":                     "us-eq",
-    "International Equities":          "intl-eq",
-    "US Large Cap":                    "us-lc",
-    "US Small Cap":                    "us-sc",
-    "US Growth":                       "us-gr",
-    "US Value":                        "us-val",
-    "Emerging Markets Equities":       "em-eq",
-    "Developed International":         "dev-intl",
-    "US Government Bonds":             "govt-us",
-    "International Debt":              "intl-debt",
-    "Investment Grade Credit":         "ig-credit",
-    "High Yield":                      "hy-bonds",
-    "Emerging Markets Debt":           "em-bonds",
-    "Gold":                            "gold",
-    "Oil / Energy":                    "oil",
+    "large-cap u.s.":            "us-lc",
+    "large cap u.s.":            "us-lc",
+    "u.s. large cap":            "us-lc",
+    "u.s. large-cap":            "us-lc",
+    "small-cap u.s.":            "us-sc",
+    "small cap u.s.":            "us-sc",
+    "u.s. small cap":            "us-sc",
+    "u.s. small-cap":            "us-sc",
+    "u.s. tech/growth":          "us-gr",
+    "u.s. growth":               "us-gr",
+    "growth":                    "us-gr",
+    "u.s. value":                "us-val",
+    "value":                     "us-val",
+    "u.s. equities":             "us-eq",
+    "u.s. equity":               "us-eq",
+    "global equities":           "intl-eq",
+    "international equities":    "intl-eq",
+    "international equity":      "intl-eq",
+    "developed international":   "dev-intl",
+    "eafe":                      "dev-intl",
+    "emerging markets equity":   "em-eq",
+    "emerging markets equities": "em-eq",
+    "emerging market":           "em-eq",
+    "long-term u.s. treasurys":  "govt-us",
+    "long-term u.s. treasuries": "govt-us",
+    "u.s. treasuries":           "govt-us",
+    "government bonds":          "govt-us",
+    "international bonds":       "intl-debt",
+    "international debt":        "intl-debt",
+    "investment grade":          "ig-credit",
+    "ig credit":                 "ig-credit",
+    "high yield":                "hy-bonds",
+    "emerging markets debt":     "em-bonds",
+    "em debt":                   "em-bonds",
+    "gold":                      "gold",
+    "commodities":               "oil",
+    "oil":                       "oil",
+    "energy":                    "oil",
+    "cash":                      None,  # handled separately in broad
 }
 
-# Map NDR's stance labels → our signal codes
+# ── Signal language → code mapping ──
 NDR_SIGNAL_MAP = {
+    "heavy overweight":   "HOW",
     "strong overweight":  "HOW",
-    "overweight":         "OW",
-    "neutral":            "N",
-    "underweight":        "UW",
-    "strong underweight": "HUW",
-    # add synonyms as you discover them in actual API responses
-    "above weight":       "OW",
-    "below weight":       "UW",
-    "maximum underweight":"HUW",
     "maximum overweight": "HOW",
+    "overweight":         "OW",
+    "above weight":       "OW",
+    "above benchmark":    "OW",
+    "neutral":            "N",
+    "market weight":      "N",
+    "benchmark weight":   "N",
+    "underweight":        "UW",
+    "below weight":       "UW",
+    "below benchmark":    "UW",
+    "heavy underweight":  "HUW",
+    "strong underweight": "HUW",
+    "maximum underweight":"HUW",
 }
 
 
 def fetch_ndr():
     """
-    Returns dict:
-      {
-        "broad":   {"equity": int, "debt": int, "cash": int, "note": str},
-        "signals": {"us-eq": "OW", ...},   # keyed by canonical asset ID
-      }
-    Raises RuntimeError if both auth methods fail.
+    Main entry point.
+    Returns:
+    {
+      "status":    "live" | "failed",
+      "message":   str,
+      "retrieved": str,
+      "broad":     { "equity": int, "debt": int, "cash": int, "note": str },
+      "signals":   { "us-eq": "OW", ... }
+    }
     """
-    logger.info("NDR: attempting REST API auth…")
+    if not NDR_USER or not NDR_PASS:
+        return _failed("NDR_USER or NDR_PASS secrets not set in GitHub Secrets.")
+
+    # Try Playwright first (handles JS-rendered pages)
     try:
-        return _fetch_via_api()
+        return _fetch_via_playwright()
+    except ImportError:
+        logger.warning("NDR: Playwright not installed, trying requests fallback")
     except Exception as e:
-        logger.warning(f"NDR REST API failed ({e}), falling back to web scrape…")
+        logger.warning("NDR: Playwright attempt failed (%s), trying requests fallback", e)
 
+    # Fallback: plain HTTP session (works if NDR serves HTML without JS)
     try:
-        return _fetch_via_web()
+        return _fetch_via_requests()
     except Exception as e:
-        raise RuntimeError(f"NDR: both API and web auth failed — {e}")
+        return _failed(f"NDR: both Playwright and requests methods failed. Last error: {e}")
 
 
-# ─────────────────────────────────────────────────────
-# METHOD 1 — REST API
-# ─────────────────────────────────────────────────────
-def _fetch_via_api():
-    session = requests.Session()
-    session.headers.update({"User-Agent": "AssetAllocationDashboard/1.0"})
+# ─────────────────────────────────────────────────────────────────
+# METHOD 1: Playwright (headless Chromium — handles JS-rendered pages)
+# GitHub Actions installs this via requirements.txt
+# ─────────────────────────────────────────────────────────────────
+def _fetch_via_playwright():
+    from playwright.sync_api import sync_playwright
 
-    # --- Authenticate ---
-    auth_r = session.post(
-        f"{NDR_API_URL}/auth/token",
-        json={"username": NDR_USER, "password": NDR_PASS},
-        timeout=30,
-    )
-    auth_r.raise_for_status()
-    token = auth_r.json().get("access_token") or auth_r.json().get("token")
-    if not token:
-        raise ValueError("NDR API: no token in auth response")
+    logger.info("NDR: starting Playwright headless browser")
 
-    session.headers["Authorization"] = f"Bearer {token}"
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        page    = browser.new_page()
 
-    # --- Pull tactical allocation ---
-    alloc_r = session.get(f"{NDR_API_URL}/allocations/tactical", timeout=30)
-    alloc_r.raise_for_status()
-    payload = alloc_r.json()
+        # ── Navigate to NDR login ──
+        logger.info("NDR: loading login page %s", NDR_LOGIN)
+        page.goto(NDR_LOGIN, wait_until="networkidle", timeout=60000)
 
-    return _parse_api_response(payload)
+        # ── Wait for login form ──
+        # NDR uses a standard username/password form
+        page.wait_for_selector("input[name='login'], input[type='email'], input[name='email']",
+                               timeout=15000)
 
+        # ── Fill credentials ──
+        # Try common NDR field names — update if their form changes
+        for selector in ["input[name='login']", "input[name='email']", "input[type='email']"]:
+            if page.query_selector(selector):
+                page.fill(selector, NDR_USER)
+                break
 
-def _parse_api_response(payload):
-    """
-    Parse NDR REST response into our standard format.
-    Adapt field names to match the real API response structure.
-    """
-    broad = {
-        # Field names are illustrative — map to real response keys
-        "equity": payload.get("weights", {}).get("equity", 0),
-        "debt":   payload.get("weights", {}).get("fixed_income", 0),
-        "cash":   payload.get("weights", {}).get("cash", 0),
-        "note":   payload.get("commentary", {}).get("summary", ""),
+        for selector in ["input[name='password']", "input[type='password']"]:
+            if page.query_selector(selector):
+                page.fill(selector, NDR_PASS)
+                break
+
+        # ── Submit form ──
+        page.click("button[type='submit'], input[type='submit'], button:has-text('Log in'), button:has-text('Sign in')")
+        page.wait_for_load_state("networkidle", timeout=30000)
+
+        current_url = page.url
+        logger.info("NDR: post-login URL: %s", current_url)
+
+        # ── Verify login succeeded ──
+        if "login" in current_url.lower() or "sign-in" in current_url.lower():
+            browser.close()
+            return _failed(
+                f"NDR login failed — credentials were rejected or form fields changed. "
+                f"Final URL: {current_url}. Check NDR_USER and NDR_PASS in GitHub Secrets."
+            )
+
+        logger.info("NDR: login succeeded. Navigating to model portfolios...")
+
+        # ── Navigate to Dynamic Allocation Strategy ──
+        page.goto(NDR_PORTFOLIO, wait_until="networkidle", timeout=30000)
+
+        # Wait for the allocation table to render
+        try:
+            page.wait_for_selector("table, .allocation-table, .model-portfolio, .asset-weights",
+                                   timeout=15000)
+        except Exception:
+            logger.warning("NDR: allocation table selector not found, proceeding with full page")
+
+        html_content = page.content()
+        title        = page.title()
+        browser.close()
+
+    signals, broad = _parse_ndr_html(html_content)
+
+    if not signals:
+        return _failed(
+            "NDR: Playwright logged in and navigated successfully, but could not parse "
+            "signals from the model portfolio page. The page layout may have changed. "
+            f"Page title was: '{title}'. Manual update required."
+        )
+
+    logger.info("NDR: extracted %d signals via Playwright", len(signals))
+    return {
+        "status":    "live",
+        "message":   f"Successfully retrieved via Playwright headless browser. Page: {title}",
+        "retrieved": f"NDR Model Portfolios — {title}",
+        "broad":     broad,
+        "signals":   signals
     }
 
-    signals = {}
-    for item in payload.get("asset_classes", []):
-        label  = item.get("name", "").strip()
-        stance = item.get("tactical_view", "").strip().lower()
-        asset_id = NDR_ASSET_MAP.get(label)
-        signal   = NDR_SIGNAL_MAP.get(stance, "N")
-        if asset_id:
-            signals[asset_id] = signal
 
-    return {"broad": broad, "signals": signals}
+# ─────────────────────────────────────────────────────────────────
+# METHOD 2: Plain HTTP session (fallback, may not work on JS pages)
+# ─────────────────────────────────────────────────────────────────
+def _fetch_via_requests():
+    import requests
+    from bs4 import BeautifulSoup
 
-
-# ─────────────────────────────────────────────────────
-# METHOD 2 — Web session scrape (fallback)
-# ─────────────────────────────────────────────────────
-def _fetch_via_web():
-    """
-    Logs into the NDR subscriber portal via HTTP session cookies,
-    then scrapes the institutional model portfolio page for signals.
-
-    You must inspect the login form on ndr.com to get the correct
-    field names and action URL — update the constants below.
-    """
-    LOGIN_URL      = f"{NDR_WEB_URL}/login"
-    PORTFOLIO_URL  = f"{NDR_WEB_URL}/institutional/model-portfolio"
+    logger.info("NDR: attempting requests-based login")
 
     session = requests.Session()
     session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/124.0 Safari/537.36"
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0 Safari/537.36"
+        )
     })
 
-    # Load the login page first (to capture any CSRF token)
-    login_page = session.get(LOGIN_URL, timeout=30)
+    # Load login page to capture hidden fields
+    login_page = session.get(NDR_LOGIN, timeout=30)
+    login_page.raise_for_status()
     soup = BeautifulSoup(login_page.text, "html.parser")
-    csrf = ""
-    csrf_input = soup.find("input", {"name": re.compile(r"csrf|_token", re.I)})
-    if csrf_input:
-        csrf = csrf_input.get("value", "")
 
-    # POST credentials
-    login_r = session.post(
-        LOGIN_URL,
-        data={
-            "username":   NDR_USER,  # update field name to match NDR's form
-            "password":   NDR_PASS,
-            "_csrf_token": csrf,
-        },
-        timeout=30,
-        allow_redirects=True,
-    )
-    if "logout" not in login_r.text.lower() and "dashboard" not in login_r.url.lower():
-        raise ValueError("NDR web login appeared to fail — check credentials or form field names")
+    hidden = {}
+    form = soup.find("form")
+    if form:
+        for inp in form.find_all("input", {"type": "hidden"}):
+            if inp.get("name"):
+                hidden[inp["name"]] = inp.get("value", "")
 
-    logger.info("NDR: web login succeeded, fetching portfolio page…")
+    payload = {
+        "login":    NDR_USER,
+        "email":    NDR_USER,
+        "password": NDR_PASS,
+        **hidden
+    }
 
-    # Fetch the model portfolio / allocation page
-    page_r = session.get(PORTFOLIO_URL, timeout=30)
-    page_r.raise_for_status()
+    r = session.post(NDR_LOGIN, data=payload, timeout=30, allow_redirects=True)
+    r.raise_for_status()
 
-    return _parse_web_page(page_r.text)
+    if "login" in r.url.lower():
+        return _failed(f"NDR requests login failed. Final URL: {r.url}")
+
+    portfolio_r = session.get(NDR_PORTFOLIO, timeout=30)
+    portfolio_r.raise_for_status()
+
+    signals, broad = _parse_ndr_html(portfolio_r.text)
+
+    if not signals:
+        return _failed("NDR: requests login worked but page content could not be parsed.")
+
+    return {
+        "status":    "live",
+        "message":   "Retrieved via HTTP session (requests). Note: JS-rendered content may be incomplete.",
+        "retrieved": NDR_PORTFOLIO,
+        "broad":     broad,
+        "signals":   signals
+    }
 
 
-def _parse_web_page(html):
+# ─────────────────────────────────────────────────────────────────
+# PARSER — works on HTML from either method
+# ─────────────────────────────────────────────────────────────────
+def _parse_ndr_html(html):
     """
-    Parse NDR's model portfolio HTML page.
-    !! This is a TEMPLATE — you must inspect the real page DOM and
-    update the CSS selectors / table column indices below. !!
+    Extract signals and broad allocation from NDR HTML.
+    Returns (signals_dict, broad_dict).
+    Update the selectors below if NDR changes their page layout.
     """
-    soup = BeautifulSoup(html, "html.parser")
+    from bs4 import BeautifulSoup
 
-    # --- Broad weights ---
-    # Adjust selector to match the actual page structure
-    broad = {"equity": 0, "debt": 0, "cash": 0, "note": "Sourced from NDR web portal"}
-    broad_table = soup.find("table", class_=re.compile(r"broad|allocation|weights", re.I))
-    if broad_table:
-        for row in broad_table.find_all("tr"):
-            cells = [td.get_text(strip=True) for td in row.find_all(["td", "th"])]
-            if len(cells) >= 2:
-                label = cells[0].lower()
-                val   = _parse_pct(cells[1])
-                if "equity"      in label: broad["equity"] = val
-                elif "bond" in label or "fixed" in label: broad["debt"] = val
-                elif "cash"      in label: broad["cash"]   = val
-
-    # --- Asset class signals ---
+    soup    = BeautifulSoup(html, "html.parser")
     signals = {}
-    signal_table = soup.find("table", class_=re.compile(r"tactical|signals|model", re.I))
-    if signal_table:
-        for row in signal_table.find_all("tr")[1:]:  # skip header
-            cells = [td.get_text(strip=True) for td in row.find_all("td")]
-            if len(cells) >= 2:
-                label  = cells[0]
-                stance = cells[1].lower()
-                asset_id = NDR_ASSET_MAP.get(label)
-                signal   = NDR_SIGNAL_MAP.get(stance, "N")
-                if asset_id:
-                    signals[asset_id] = signal
+    broad   = {
+        "equity": 57, "debt": 31, "cash": 12,
+        "note": "NDR Dynamic Allocation Strategy — retrieved from ndr.com"
+    }
 
-    return {"broad": broad, "signals": signals}
+    # ── Try to find a weights / allocation table ──
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        for row in rows:
+            cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
+            if len(cells) < 2:
+                continue
+
+            label  = cells[0].lower()
+            stance = cells[-1].lower()  # signal is typically in last column
+
+            asset_id = _map_ndr_asset(label)
+            signal   = _map_ndr_signal(stance)
+
+            if asset_id and signal:
+                signals[asset_id] = signal
+
+            # Parse broad allocation percentages
+            pct = re.search(r"(\d+\.?\d*)\s*%", stance)
+            if pct:
+                val = float(pct.group(1))
+                if "equity" in label or "stock" in label:
+                    broad["equity"] = int(val)
+                elif "bond" in label or "fixed" in label or "debt" in label:
+                    broad["debt"] = int(val)
+                elif "cash" in label or "money market" in label:
+                    broad["cash"] = int(val)
+
+    # ── Scan full text for signal language if table parse found nothing ──
+    if not signals:
+        text = soup.get_text(separator="\n")
+        for line in text.split("\n"):
+            line_lower = line.lower().strip()
+            for asset_phrase, asset_id in NDR_ASSET_MAP.items():
+                if asset_phrase in line_lower and asset_id:
+                    for sig_phrase, sig_code in NDR_SIGNAL_MAP.items():
+                        if sig_phrase in line_lower:
+                            signals[asset_id] = sig_code
+                            break
+
+    return signals, broad
 
 
-def _parse_pct(s):
-    """Extract numeric percentage from strings like '57%', '57.0', '57'."""
-    try:
-        return int(float(re.sub(r"[^\d.]", "", s)))
-    except Exception:
-        return 0
+def _map_ndr_asset(label):
+    label = label.lower().strip()
+    for phrase, asset_id in NDR_ASSET_MAP.items():
+        if phrase in label:
+            return asset_id
+    return None
+
+
+def _map_ndr_signal(stance):
+    stance = stance.lower().strip()
+    for phrase, code in NDR_SIGNAL_MAP.items():
+        if phrase in stance:
+            return code
+    return None
+
+
+def _failed(message):
+    logger.error("NDR: %s", message)
+    return {
+        "status":    "failed",
+        "message":   message,
+        "retrieved": "none",
+        "broad":     {"equity": 57, "debt": 31, "cash": 12, "note": "Fallback — NDR retrieval failed"},
+        "signals":   {}
+    }

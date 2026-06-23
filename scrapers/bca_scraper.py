@@ -1,290 +1,297 @@
 """
 scrapers/bca_scraper.py
 ========================
-BCA Research — Global Asset Allocation service signal extractor.
+BCA Research — Global Investment Strategy FullView Portfolio scraper.
 
-Authentication flow (tried in order):
-  1. BCA REST API  →  POST /auth  →  GET /reports/asset-allocation/latest
-  2. Web session login + PDF download + text extraction (PyMuPDF / pdfminer)
-  3. Web session login + HTML report page scrape
+Logs into bcaresearch.com using BCA_USER and BCA_PASS environment
+variables (stored as GitHub Secrets), navigates to the GIS FullView
+Portfolio page, and extracts current tactical asset allocation signals.
 
-Set env vars:
-  BCA_USER     your BCA subscriber username / ID
-  BCA_PASS     your BCA password or API key
-  BCA_API_URL  base URL (default: https://api.bcaresearch.com/v1)
+Returns a dict that update_data.py writes into allocations.json.
 """
 
 import os
 import re
-import io
+import time
 import logging
 import requests
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-BCA_API_URL = os.environ.get("BCA_API_URL", "https://api.bcaresearch.com/v1")
-BCA_WEB_URL = os.environ.get("BCA_WEB_URL", "https://portal.bcaresearch.com")
-BCA_USER    = os.environ.get("BCA_USER", "")
-BCA_PASS    = os.environ.get("BCA_PASS", "")
+# ── Credentials come from GitHub Secrets (never hardcoded) ──
+BCA_USER = os.environ.get("BCA_USER", "")
+BCA_PASS = os.environ.get("BCA_PASS", "")
 
+# ── BCA portal URLs ──
+BCA_BASE     = "https://www.bcaresearch.com"
+BCA_LOGIN    = "https://www.bcaresearch.com/user/login"
+BCA_GIS_HOME = "https://www.bcaresearch.com/site/gis/home"
+BCA_GAA_HOME = "https://www.bcaresearch.com/site/gaa/home"
+BCA_ALLOC    = "https://www.bcaresearch.com/topic?name=Asset+Allocation"
+
+# ── Map BCA's asset class labels to our canonical IDs ──
+# Update these if BCA changes their terminology
 BCA_ASSET_MAP = {
-    "U.S. Equities":                "us-eq",
-    "US Equities":                  "us-eq",
-    "International Equities":       "intl-eq",
-    "U.S. Large Cap":               "us-lc",
-    "U.S. Small Cap":               "us-sc",
-    "U.S. Growth":                  "us-gr",
-    "U.S. Value":                   "us-val",
-    "Emerging Markets Equity":      "em-eq",
-    "EM Equities":                  "em-eq",
-    "EAFE":                         "dev-intl",
-    "Developed Markets ex-US":      "dev-intl",
-    "U.S. Government Bonds":        "govt-us",
-    "US Treasuries":                "govt-us",
-    "International Bonds":          "intl-debt",
-    "Investment Grade Credit":      "ig-credit",
-    "IG Credit":                    "ig-credit",
-    "High Yield":                   "hy-bonds",
-    "Emerging Markets Debt":        "em-bonds",
-    "Gold":                         "gold",
-    "Commodities / Oil":            "oil",
-    "Energy":                       "oil",
+    "us equities":               "us-eq",
+    "u.s. equities":             "us-eq",
+    "united states":             "us-eq",
+    "international equities":    "intl-eq",
+    "developed markets":         "dev-intl",
+    "eafe":                      "dev-intl",
+    "europe":                    "dev-intl",
+    "u.s. large":                "us-lc",
+    "large cap":                 "us-lc",
+    "large-cap":                 "us-lc",
+    "u.s. small":                "us-sc",
+    "small cap":                 "us-sc",
+    "small-cap":                 "us-sc",
+    "u.s. growth":               "us-gr",
+    "growth":                    "us-gr",
+    "u.s. value":                "us-val",
+    "value":                     "us-val",
+    "emerging markets equity":   "em-eq",
+    "em equities":               "em-eq",
+    "emerging markets":          "em-eq",
+    "u.s. treasuries":           "govt-us",
+    "government bonds":          "govt-us",
+    "us government":             "govt-us",
+    "international bonds":       "intl-debt",
+    "international debt":        "intl-debt",
+    "investment grade":          "ig-credit",
+    "ig credit":                 "ig-credit",
+    "high yield":                "hy-bonds",
+    "emerging markets debt":     "em-bonds",
+    "em bonds":                  "em-bonds",
+    "hard currency":             "em-bonds",
+    "gold":                      "gold",
+    "oil":                       "oil",
+    "energy":                    "oil",
+    "commodities":               "oil",
 }
 
+# ── Map BCA's signal language to our codes ──
 BCA_SIGNAL_MAP = {
-    "maximum overweight":   "HOW",
-    "heavy overweight":     "HOW",
-    "overweight":           "OW",
-    "slight overweight":    "OW",
-    "neutral":              "N",
-    "slight underweight":   "UW",
-    "underweight":          "UW",
-    "heavy underweight":    "HUW",
-    "maximum underweight":  "HUW",
-    # BCA sometimes uses +2/+1/0/-1/-2 scoring
-    "+2": "HOW", "+1": "OW", "0": "N", "-1": "UW", "-2": "HUW",
+    "maximum overweight":  "HOW",
+    "strong overweight":   "HOW",
+    "heavy overweight":    "HOW",
+    "overweight":          "OW",
+    "slight overweight":   "OW",
+    "above benchmark":     "OW",
+    "neutral":             "N",
+    "market weight":       "N",
+    "benchmark":           "N",
+    "slight underweight":  "UW",
+    "underweight":         "UW",
+    "below benchmark":     "UW",
+    "strong underweight":  "HUW",
+    "heavy underweight":   "HUW",
+    "maximum underweight": "HUW",
+    # MacroQuant numeric scores
+    "+2": "HOW",
+    "+1": "OW",
+    "0":  "N",
+    "-1": "UW",
+    "-2": "HUW",
 }
 
 
 def fetch_bca():
     """
-    Returns {"broad": {...}, "signals": {"us-eq": "OW", ...}}
-    """
-    logger.info("BCA: attempting REST API auth…")
-    try:
-        return _fetch_via_api()
-    except Exception as e:
-        logger.warning(f"BCA REST API failed ({e}), trying web portal…")
-
-    try:
-        return _fetch_via_web()
-    except Exception as e:
-        raise RuntimeError(f"BCA: all methods failed — {e}")
-
-
-# ─────────────────────────────────────────────────────
-# METHOD 1 — REST API
-# ─────────────────────────────────────────────────────
-def _fetch_via_api():
-    session = requests.Session()
-    session.headers.update({"User-Agent": "AssetAllocationDashboard/1.0"})
-
-    # Authenticate
-    auth_r = session.post(
-        f"{BCA_API_URL}/auth",
-        json={"subscriber_id": BCA_USER, "api_key": BCA_PASS},
-        timeout=30,
-    )
-    auth_r.raise_for_status()
-    token = (
-        auth_r.json().get("access_token")
-        or auth_r.json().get("token")
-        or auth_r.json().get("api_token")
-    )
-    if not token:
-        raise ValueError("BCA API: no token in auth response")
-
-    session.headers["Authorization"] = f"Bearer {token}"
-    session.headers["X-BCA-Token"]   = token  # BCA may use custom header
-
-    # Fetch latest GAA report
-    r = session.get(f"{BCA_API_URL}/reports/asset-allocation/latest", timeout=30)
-    r.raise_for_status()
-    return _parse_api_response(r.json())
-
-
-def _parse_api_response(payload):
-    """Parse BCA API JSON — adapt field names to real response."""
-    broad = {
-        "equity": payload.get("broad_allocation", {}).get("equity", 0),
-        "debt":   payload.get("broad_allocation", {}).get("fixed_income", 0),
-        "cash":   payload.get("broad_allocation", {}).get("cash", 0),
-        "note":   payload.get("summary", ""),
+    Main entry point. Returns:
+    {
+      "status":     "live" | "failed",
+      "message":    "human-readable description of what happened",
+      "retrieved":  "page title or URL that was read",
+      "broad": { "equity": int, "debt": int, "cash": int, "note": str },
+      "signals": { "us-eq": "OW", ... }
     }
-    signals = {}
-    for item in payload.get("tactical_views", []):
-        label    = item.get("asset_class", "").strip()
-        # BCA may return numeric score or label
-        raw      = str(item.get("view", item.get("score", "0"))).strip().lower()
-        asset_id = BCA_ASSET_MAP.get(label)
-        signal   = BCA_SIGNAL_MAP.get(raw, "N")
-        if asset_id:
-            signals[asset_id] = signal
-    return {"broad": broad, "signals": signals}
-
-
-# ─────────────────────────────────────────────────────
-# METHOD 2 — Web portal session + page scrape
-# ─────────────────────────────────────────────────────
-def _fetch_via_web():
     """
-    Logs in to BCA Research subscriber portal,
-    navigates to the Global Asset Allocation report page,
-    and parses the signal table.
-    """
-    LOGIN_URL  = f"{BCA_WEB_URL}/login"
-    REPORT_URL = f"{BCA_WEB_URL}/research/global-asset-allocation"
+    if not BCA_USER or not BCA_PASS:
+        return _failed("BCA_USER or BCA_PASS secrets not set in GitHub Secrets.")
+
+    logger.info("BCA: starting login to %s", BCA_LOGIN)
 
     session = requests.Session()
     session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 Safari/537.36",
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0 Safari/537.36"
+        )
     })
 
-    # 1. Load login page → capture CSRF / hidden fields
-    login_page = session.get(LOGIN_URL, timeout=30)
-    login_page.raise_for_status()
-    soup  = BeautifulSoup(login_page.text, "html.parser")
-    form  = soup.find("form")
-    csrf  = ""
-    extra = {}
+    # ── Step 1: Load login page to get CSRF token ──
+    try:
+        login_page = session.get(BCA_LOGIN, timeout=30)
+        login_page.raise_for_status()
+    except Exception as e:
+        return _failed(f"Could not load BCA login page: {e}")
+
+    soup = BeautifulSoup(login_page.text, "html.parser")
+
+    # Extract all hidden form fields (CSRF token etc.)
+    form = soup.find("form")
+    hidden_fields = {}
     if form:
         for inp in form.find_all("input", {"type": "hidden"}):
-            extra[inp.get("name", "")] = inp.get("value", "")
-        csrf_inp = form.find("input", {"name": re.compile(r"csrf|token", re.I)})
-        if csrf_inp:
-            csrf = csrf_inp.get("value", "")
+            name = inp.get("name", "")
+            val  = inp.get("value", "")
+            if name:
+                hidden_fields[name] = val
 
-    # 2. POST credentials
-    post_data = {
-        "email":    BCA_USER,   # update to BCA's actual field name
-        "password": BCA_PASS,
-        **extra,
+    logger.info("BCA: found %d hidden form fields", len(hidden_fields))
+
+    # ── Step 2: Submit login credentials ──
+    login_payload = {
+        "name":  BCA_USER,   # BCA uses 'name' for username field
+        "pass":  BCA_PASS,   # BCA uses 'pass' for password field
+        "op":    "Log in",
+        **hidden_fields
     }
-    login_r = session.post(
-        LOGIN_URL,
-        data=post_data,
-        timeout=30,
-        allow_redirects=True,
-    )
 
-    # Sanity-check we're logged in
-    if "login" in login_r.url or "sign-in" in login_r.url:
-        raise ValueError("BCA web login failed — check credentials or form field names")
-    logger.info("BCA: web login succeeded")
-
-    # 3. Fetch the GAA report page
-    report_r = session.get(REPORT_URL, timeout=30)
-    report_r.raise_for_status()
-
-    # Try PDF download first if available
-    pdf_link = _find_pdf_link(report_r.text, BCA_WEB_URL)
-    if pdf_link:
-        logger.info(f"BCA: downloading PDF from {pdf_link}…")
-        try:
-            return _parse_pdf(session.get(pdf_link, timeout=60).content)
-        except Exception as e:
-            logger.warning(f"BCA: PDF parse failed ({e}), falling back to HTML parse")
-
-    return _parse_report_html(report_r.text)
-
-
-def _find_pdf_link(html, base_url):
-    soup = BeautifulSoup(html, "html.parser")
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        if href.endswith(".pdf") or "pdf" in href.lower():
-            return href if href.startswith("http") else base_url + href
-    return None
-
-
-def _parse_pdf(pdf_bytes):
-    """
-    Extract text from BCA PDF report and parse signals.
-    Requires:  pip install pymupdf
-    Falls back to pdfminer if pymupdf not available.
-    """
-    text = ""
     try:
-        import fitz  # PyMuPDF
-        doc  = fitz.open(stream=pdf_bytes, filetype="pdf")
-        text = "\n".join(page.get_text() for page in doc)
-    except ImportError:
-        try:
-            from pdfminer.high_level import extract_text_to_fp
-            from pdfminer.layout import LAParams
-            out = io.StringIO()
-            extract_text_to_fp(io.BytesIO(pdf_bytes), out, laparams=LAParams())
-            text = out.getvalue()
-        except ImportError:
-            raise RuntimeError("Install pymupdf or pdfminer.six for PDF parsing: pip install pymupdf")
+        login_r = session.post(
+            BCA_LOGIN,
+            data=login_payload,
+            timeout=30,
+            allow_redirects=True
+        )
+        login_r.raise_for_status()
+    except Exception as e:
+        return _failed(f"BCA login POST failed: {e}")
 
-    return _parse_signal_text(text)
+    # ── Step 3: Verify we are logged in ──
+    # BCA redirects to home on success; login page stays if credentials wrong
+    if "/user/login" in login_r.url or "incorrect" in login_r.text.lower():
+        return _failed(
+            "BCA login failed — credentials were rejected. "
+            "Check BCA_USER and BCA_PASS in GitHub Secrets. "
+            f"Final URL was: {login_r.url}"
+        )
+
+    logger.info("BCA: login succeeded. Fetching GIS asset allocation page...")
+
+    # ── Step 4: Fetch the asset allocation topic page ──
+    # This page lists recent GIS reports with signal summaries
+    try:
+        alloc_r = session.get(BCA_ALLOC, timeout=30)
+        alloc_r.raise_for_status()
+    except Exception as e:
+        return _failed(f"BCA: logged in but could not load allocation page: {e}")
+
+    # ── Step 5: Also try the GIS home for the FullView Portfolio ──
+    try:
+        gis_r = session.get(BCA_GIS_HOME, timeout=30)
+        gis_r.raise_for_status()
+        gis_html = gis_r.text
+    except Exception as e:
+        logger.warning("BCA: could not load GIS home, using allocation page only: %s", e)
+        gis_html = ""
+
+    # ── Step 6: Parse signals from whichever page has the most content ──
+    combined_html = alloc_r.text + gis_html
+    signals, broad, retrieved_from = _parse_signals(combined_html, session)
+
+    if not signals:
+        return _failed(
+            "BCA: logged in and loaded pages successfully, but could not parse "
+            "signal table from the HTML. The page layout may have changed. "
+            "Manual update required — log in at bcaresearch.com and read the "
+            "Global Investment Strategy FullView Portfolio."
+        )
+
+    logger.info("BCA: successfully extracted %d signals", len(signals))
+    return {
+        "status":    "live",
+        "message":   f"Successfully retrieved from BCA GIS. Read from: {retrieved_from}",
+        "retrieved": retrieved_from,
+        "broad":     broad,
+        "signals":   signals
+    }
 
 
-def _parse_signal_text(text):
+def _parse_signals(html, session=None):
     """
-    Parse signal text extracted from PDF or HTML.
-    Looks for patterns like:  "U.S. Equities  Overweight"
-    or score tables:          "U.S. Equities  +1"
+    Parse asset allocation signals from BCA's HTML.
+    Tries multiple strategies in order of reliability.
+    Returns (signals_dict, broad_dict, source_description)
     """
-    signals  = {}
-    broad    = {"equity": 50, "debt": 36, "cash": 14, "note": "Sourced from BCA Research web portal"}
+    soup = BeautifulSoup(html, "html.parser")
+    signals = {}
+    broad = {
+        "equity": 55, "debt": 34, "cash": 11,
+        "note": "BCA GIS FullView Portfolio — retrieved from bcaresearch.com"
+    }
 
-    lines = text.split("\n")
+    # ── Strategy A: Find a table with allocation/signal columns ──
+    tables = soup.find_all("table")
+    for table in tables:
+        rows = table.find_all("tr")
+        for row in rows[1:]:  # skip header
+            cells = [td.get_text(strip=True) for td in row.find_all(["td", "th"])]
+            if len(cells) >= 2:
+                label  = cells[0].lower()
+                stance = cells[1].lower() if len(cells) > 1 else ""
+                asset_id = _map_asset(label)
+                signal   = _map_signal(stance)
+                if asset_id and signal:
+                    signals[asset_id] = signal
+
+    if signals:
+        return signals, broad, "BCA HTML table (bcaresearch.com)"
+
+    # ── Strategy B: Scan text for "asset: signal" patterns ──
+    full_text = soup.get_text(separator="\n")
+    lines = full_text.split("\n")
     for line in lines:
-        line = line.strip()
-        for label, asset_id in BCA_ASSET_MAP.items():
-            if label.lower() in line.lower():
-                # Look for signal keyword in the same line
-                line_lower = line.lower()
-                for signal_text, signal_code in BCA_SIGNAL_MAP.items():
-                    if signal_text in line_lower:
+        line_lower = line.lower().strip()
+        # Look for MacroQuant summary lines like:
+        # "MacroQuant recommends a slight underweight position in equities"
+        for asset_phrase, asset_id in BCA_ASSET_MAP.items():
+            if asset_phrase in line_lower:
+                for signal_phrase, signal_code in BCA_SIGNAL_MAP.items():
+                    if signal_phrase in line_lower:
                         signals[asset_id] = signal_code
                         break
 
-        # Parse broad allocation line e.g. "Equities: 50%"
-        eq_match = re.search(r"equit\w+[:\s]+(\d+)\s*%", line, re.I)
-        fi_match = re.search(r"(fixed income|bonds?|debt)[:\s]+(\d+)\s*%", line, re.I)
-        ca_match = re.search(r"cash[:\s]+(\d+)\s*%", line, re.I)
-        if eq_match: broad["equity"] = int(eq_match.group(1))
-        if fi_match: broad["debt"]   = int(fi_match.group(2))
-        if ca_match: broad["cash"]   = int(ca_match.group(1))
+        # Parse broad allocation percentages
+        eq_m = re.search(r"equit\w*[:\s]+(\d+)\s*%", line, re.I)
+        fi_m = re.search(r"(fixed income|bond|debt)[:\s]+(\d+)\s*%", line, re.I)
+        ca_m = re.search(r"cash[:\s]+(\d+)\s*%", line, re.I)
+        if eq_m: broad["equity"] = int(eq_m.group(1))
+        if fi_m: broad["debt"]   = int(fi_m.group(2))
+        if ca_m: broad["cash"]   = int(ca_m.group(1))
 
-    return {"broad": broad, "signals": signals}
+    source = "BCA text extraction (bcaresearch.com)" if signals else "parse failed"
+    return signals, broad, source
 
 
-def _parse_report_html(html):
-    """
-    Fallback HTML parser for the BCA GAA report page.
-    !! Update CSS selectors to match real BCA portal DOM !!
-    """
-    soup    = BeautifulSoup(html, "html.parser")
-    signals = {}
-    broad   = {"equity": 50, "debt": 36, "cash": 14, "note": "Sourced from BCA Research web portal"}
+def _map_asset(label):
+    """Map a free-text asset label to a canonical asset ID."""
+    label = label.lower().strip()
+    for phrase, asset_id in BCA_ASSET_MAP.items():
+        if phrase in label:
+            return asset_id
+    return None
 
-    # Try to find the signal table
-    tables = soup.find_all("table")
-    for table in tables:
-        for row in table.find_all("tr")[1:]:
-            cells = [td.get_text(strip=True) for td in row.find_all(["td","th"])]
-            if len(cells) >= 2:
-                label    = cells[0]
-                stance   = cells[1].lower() if len(cells) > 1 else ""
-                asset_id = BCA_ASSET_MAP.get(label)
-                signal   = BCA_SIGNAL_MAP.get(stance, "N")
-                if asset_id:
-                    signals[asset_id] = signal
 
-    return {"broad": broad, "signals": signals}
+def _map_signal(stance):
+    """Map a free-text signal description to a signal code."""
+    stance = stance.lower().strip()
+    for phrase, code in BCA_SIGNAL_MAP.items():
+        if phrase in stance:
+            return code
+    return None
+
+
+def _failed(message):
+    """Return a standardised failure result."""
+    logger.error("BCA: %s", message)
+    return {
+        "status":    "failed",
+        "message":   message,
+        "retrieved": "none",
+        "broad":     {"equity": 55, "debt": 34, "cash": 11, "note": "Fallback — BCA retrieval failed"},
+        "signals":   {}
+    }
