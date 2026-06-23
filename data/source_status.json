@@ -1,0 +1,32 @@
+{
+  "updated": "2026-06-23T14:17:12.178386",
+  "providers": [
+    {
+      "firm": "NDR House Views",
+      "firm_key": "NDR",
+      "status": "failed",
+      "message": "NDR: requests login worked but page content could not be parsed.",
+      "retrieved": "none",
+      "retrieved_on": "June 23, 2026 at 14:17 UTC",
+      "retrieved_by": "GitHub Actions \u2014 automated scraper"
+    },
+    {
+      "firm": "BlackRock BII Weekly",
+      "firm_key": "BlackRock",
+      "status": "live",
+      "message": "Successfully retrieved from public BII PDF. URL: https://www.blackrock.com/us/individual/literature/market-commentary/weekly-investment-commentary-en-us-20260622-powering-through-energy-bottlenecks.pdf",
+      "retrieved": "https://www.blackrock.com/us/individual/literature/market-commentary/weekly-investment-commentary-en-us-20260622-powering-through-energy-bottlenecks.pdf",
+      "retrieved_on": "June 23, 2026 at 14:17 UTC",
+      "retrieved_by": "GitHub Actions \u2014 automated scraper"
+    },
+    {
+      "firm": "BCA GIS FullView",
+      "firm_key": "BCA",
+      "status": "failed",
+      "message": "BCA login failed \u2014 credentials were rejected. Check BCA_USER and BCA_PASS in GitHub Secrets. Final URL was: https://www.bcaresearch.com/user/login",
+      "retrieved": "none",
+      "retrieved_on": "June 23, 2026 at 14:17 UTC",
+      "retrieved_by": "GitHub Actions \u2014 automated scraper"
+    }
+  ]
+}
