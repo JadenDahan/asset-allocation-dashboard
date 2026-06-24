@@ -94,7 +94,11 @@ def fetch_ndr():
 
 
 def _via_playwright():
-    from playwright.sync_api import sync_playwright
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception:
+        raise
+
     log.info("NDR: launching Playwright")
 
     with sync_playwright() as pw:
@@ -106,27 +110,74 @@ def _via_playwright():
 
         # Fill credentials — NDR uses standard username/password form
         # Try common field selectors
+        username_filled = False
         for sel in ["input[name='login']", "input[name='email']",
-                    "input[type='email']", "input[name='username']"]:
-            if page.query_selector(sel):
-                page.fill(sel, NDR_USER)
+                    "input[type='email']", "input[name='username']",
+                    "input#username", "input#email", "input[name='user']"]:
+            el = page.query_selector(sel)
+            if el:
+                try:
+                    el.fill(NDR_USER)
+                    username_filled = True
+                except Exception:
+                    pass
                 break
 
-        for sel in ["input[name='password']", "input[type='password']"]:
-            if page.query_selector(sel):
-                page.fill(sel, NDR_PASS)
+        password_selector = None
+        for sel in ["input[name='password']", "input[type='password']", "input#password"]:
+            el = page.query_selector(sel)
+            if el:
+                try:
+                    el.fill(NDR_PASS)
+                    password_selector = sel
+                except Exception:
+                    pass
                 break
 
-        # Submit
-        page.click("button[type='submit'], input[type='submit'], "
-                   "button:has-text('Sign in'), button:has-text('Log in')")
+        # Try submitting. Some sites don't have a submit button or require pressing Enter.
+        submitted = False
+        try:
+            # Try common submit buttons
+            if page.query_selector("button[type='submit'], input[type='submit'], button:has-text('Sign in'), button:has-text('Log in')"):
+                page.click("button[type='submit'], input[type='submit'], button:has-text('Sign in'), button:has-text('Log in')")
+                submitted = True
+        except Exception:
+            submitted = False
+
+        # If not submitted, try pressing Enter in the password field
+        if not submitted and password_selector:
+            try:
+                el = page.query_selector(password_selector)
+                if el:
+                    el.press("Enter")
+                    submitted = True
+            except Exception:
+                submitted = False
+
+        # As a last resort, submit the first form on the page
+        if not submitted:
+            try:
+                page.eval_on_selector("form", "f => f.submit()")
+                submitted = True
+            except Exception:
+                pass
+
         page.wait_for_load_state("networkidle", timeout=30000)
 
-        if "login" in page.url.lower():
+        # Detect SSO/third-party login flows which cannot be automated here
+        current_url = page.url or ""
+        if "login" in current_url.lower() and "ndr" in current_url.lower():
             browser.close()
             return _fail(
-                f"NDR login rejected — check NDR_USER and NDR_PASS in GitHub Secrets. "
-                f"Final URL: {page.url}"
+                f"NDR login rejected — check NDR_USER and NDR_PASS in GitHub Secrets. Final URL: {current_url}"
+            )
+
+        # If we've been redirected off ndr.com (e.g., Okta/Azure/SSO), surface that
+        if current_url and "ndr.com" not in current_url.lower():
+            browser.close()
+            return _fail(
+                f"NDR appears to use SSO or a third-party identity provider (redirected to {current_url}). "
+                "Automated username/password login is likely not possible."
             )
 
         log.info("NDR: logged in. Looking for House Views page…")
@@ -141,12 +192,23 @@ def _via_playwright():
         ]:
             el = page.query_selector(selector)
             if el:
-                el.click()
-                page.wait_for_load_state("networkidle", timeout=20000)
+                try:
+                    el.click()
+                    page.wait_for_load_state("networkidle", timeout=20000)
+                except Exception:
+                    pass
                 break
 
         title = page.title()
-        html  = page.content()
+        html = page.content()
+        # Save a copy for debugging when parsing fails
+        try:
+            with open("/tmp/ndr_last_page.html", "w", encoding="utf-8") as f:
+                f.write(html)
+        except Exception:
+            # ignore filesystem errors; helpful when running locally
+            pass
+
         browser.close()
 
     assets = _parse_html(html)
@@ -169,21 +231,59 @@ def _via_playwright():
 def _via_requests():
     import requests
     from bs4 import BeautifulSoup
+    from urllib.parse import urljoin
 
     log.info("NDR: attempting requests-based login")
     s = requests.Session()
     s.headers["User-Agent"] = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                 "AppleWebKit/537.36 Chrome/124.0 Safari/537.36")
 
-    # Load login page to capture hidden fields
+    # Load login page to capture hidden fields and form
     r = s.get(NDR_LOGIN, timeout=30)
     soup = BeautifulSoup(r.text, "html.parser")
+
+    # Find a login form and discover the input names and action
+    form = soup.find("form")
+    login_action = NDR_LOGIN
     hidden = {i["name"]: i.get("value", "")
               for i in soup.find_all("input", type="hidden") if i.get("name")}
 
-    s.post(NDR_LOGIN, data={"login": NDR_USER, "email": NDR_USER,
-                             "password": NDR_PASS, **hidden},
-           timeout=30, allow_redirects=True)
+    username_field = None
+    password_field = None
+
+    if form:
+        action = form.get("action")
+        if action:
+            login_action = urljoin(NDR_LOGIN, action)
+
+        # Inspect inputs inside the form for likely username/password fields
+        for inp in form.find_all("input"):
+            n = inp.get("name") or ""
+            t = (inp.get("type") or "").lower()
+            nl = n.lower()
+            if (t in ("text", "email") or 'user' in nl or 'login' in nl or 'email' in nl) and not username_field:
+                username_field = n
+            if t == "password" or 'pass' in nl:
+                password_field = n
+
+    # Fallback common names
+    if not username_field:
+        username_field = "login"
+    if not password_field:
+        password_field = "password"
+
+    payload = {**hidden, username_field: NDR_USER, password_field: NDR_PASS}
+    # also add common aliases so the form receives at least one expected field
+    payload.setdefault('email', NDR_USER)
+    payload.setdefault('login', NDR_USER)
+    payload.setdefault('password', NDR_PASS)
+
+    r2 = s.post(login_action, data=payload, timeout=30, allow_redirects=True)
+
+    # If the login endpoint redirected to a non-NDR domain, it's likely SSO
+    if r2.history and r2.url and 'ndr.com' not in r2.url.lower():
+        return _fail(f"NDR appears to use SSO or third-party auth (redirect to {r2.url}). "
+                     "Automated username/password login is likely not possible.")
 
     # Try fetching House Views directly
     for url in [
@@ -201,6 +301,13 @@ def _via_requests():
                 "retrieved": url,
                 "assets":    assets
             }
+
+    # Save last response for debugging
+    try:
+        with open('/tmp/ndr_last_requests.html', 'w', encoding='utf-8') as f:
+            f.write(r2.text if 'r2' in locals() and r2 is not None else r.text)
+    except Exception:
+        pass
 
     return _fail("Requests login worked but could not find or parse House Views table.")
 
