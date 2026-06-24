@@ -15,8 +15,7 @@ log = logging.getLogger(__name__)
 BII_URL = ("https://www.blackrock.com/corporate/insights/"
            "blackrock-investment-institute/publications/outlook")
 
-BII_WEEKLY = ("https://www.blackrock.com/us/individual/insights/"
-              "blackrock-investment-institute/weekly-commentary")
+BII_WEEKLY = ("https://www.blackrock.com/corporate/literature/whitepaper/bii-global-outlook-in-charts.pdf")
 
 # Map BII asset labels → canonical IDs
 # BII covers broad asset classes, not always sub-asset level
