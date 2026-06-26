@@ -4,849 +4,1049 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Founders Financial — Investment Committee Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
-/* ══════════════════════════════════════════════════════
-   FOUNDERS FINANCIAL — INVESTMENT COMMITTEE DASHBOARD
-   Colours, spacing, and type all live here.
-   To change a colour: edit the variable in :root {}
-   ══════════════════════════════════════════════════════ */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/*
+ ╔══════════════════════════════════════════════════════════════╗
+ ║  FOUNDERS FINANCIAL — INVESTMENT COMMITTEE DASHBOARD         ║
+ ║  Scoring schema — applied identically to every signal:       ║
+ ║                                                              ║
+ ║  MODE A — Weighted (NDR top-level, BCA all assets)           ║
+ ║    active = position% − benchmark%                           ║
+ ║    active > +5  → HOW (+2)                                   ║
+ ║    active > +2  → OW  (+1)                                   ║
+ ║    active ≥ -2  → MW  ( 0)                                   ║
+ ║    active ≥ -5  → UW  (-1)                                   ║
+ ║    active < -5  → HUW (-2)                                   ║
+ ║                                                              ║
+ ║  MODE B — Directional (NDR sub-assets, BCA overlays)         ║
+ ║    OVER / BULLISH / OVERWEIGHT → OW  (+1)                    ║
+ ║    MARKET / NEUTRAL             → MW  ( 0)                   ║
+ ║    UNDER / BEARISH / UNDERWEIGHT→ UW  (-1)                   ║
+ ║    (no high-conviction modifier available in directional)    ║
+ ║                                                              ║
+ ║  BlackRock 60/40 ETF — always MODE A                         ║
+ ║    position = ETF holding % (from PDF 60/40 column)          ║
+ ║    benchmark = (NDR_bm + BCA_bm) / 2 per asset              ║
+ ║    Falls back to BLK stated benchmark if NDR/BCA not loaded  ║
+ ║                                                              ║
+ ║  Consensus = avg of scores from covering firms only          ║
+ ║  "Not Covered" = excluded from consensus, not zero           ║
+ ╚══════════════════════════════════════════════════════════════╝
+*/
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:  #0E1C2F; --navy2: #122035; --navy3: #192D45;
+  --navy4: #213552; --navy5: #2B4268;
+  --gold:  #C9A96E; --gold2: #A8844A; --gold3: #E8C98A;
+  --white: #EEF3FA; --silver:#859DB8; --dim:   #475F7A;
+  --how:#22C55E; --ow:#4ADE80; --mw:#8BA3BE; --uw:#F87171; --huw:#EF4444;
+}
+body{background:var(--navy);color:var(--white);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;min-height:100vh}
 
-:root {
-  /* Brand colours */
-  --navy:   #0E1C2F;
-  --navy2:  #132338;
-  --navy3:  #1A2E47;
-  --navy4:  #243859;
-  --navy5:  #2E4870;
-  --gold:   #C9A96E;
-  --gold2:  #A8844A;
-  --white:  #F0F5FA;
-  --silver: #8BA3BE;
-  --dim:    #4A6480;
-
-  /* Signal colours — edit these to change badge colours */
-  --how:  #22C55E;   /* Heavy Overweight  — bright green  */
-  --ow:   #4ADE80;   /* Overweight        — light green   */
-  --mw:   #8BA3BE;   /* Market Weight     — grey-blue     */
-  --uw:   #F87171;   /* Underweight       — coral         */
-  --huw:  #EF4444;   /* Heavy Underweight — deep red      */
-  --na:   #374151;   /* Not covered       — dark grey     */
-}
-
-body {
-  background: var(--navy);
-  color: var(--white);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  line-height: 1.5;
-  min-height: 100vh;
-}
-
-/* ── TOP BAR ── */
-.topbar {
-  background: var(--navy);
-  border-bottom: 1px solid var(--navy4);
-  box-shadow: 0 1px 0 0 var(--gold2);
-  padding: .7rem 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  flex-wrap: wrap;
-  gap: .5rem;
-}
-.brand { display: flex; align-items: center; gap: 10px; }
-.ff-mark {
-  width: 32px; height: 32px;
-  border: 2px solid var(--white);
-  border-radius: 3px;
-  display: flex; align-items: center; justify-content: center;
-  position: relative; flex-shrink: 0;
-  font-family: 'EB Garamond', serif;
-  font-size: .85rem; font-weight: 600;
-  color: var(--white);
-}
-.ff-mark::after {
-  content: '';
-  position: absolute; inset: 2px;
-  border: 1px solid rgba(255,255,255,.3);
-  border-radius: 1px;
-}
-.brand-text .name {
-  font-family: 'EB Garamond', serif;
-  font-size: 1.05rem; font-weight: 500;
-  line-height: 1.2;
-}
-.brand-text .sub {
-  font-size: .58rem;
-  color: var(--gold);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-.topbar-right {
-  display: flex; align-items: center; gap: 1rem;
-  flex-wrap: wrap;
-}
-.as-of {
-  font-size: .65rem;
-  color: var(--silver);
-  font-family: 'IBM Plex Mono', monospace;
-}
-.as-of strong { color: var(--gold); }
+/* ── TOPBAR ── */
+.topbar{background:var(--navy);border-bottom:1px solid var(--navy4);box-shadow:0 1px 0 0 var(--gold2);padding:.65rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:.5rem}
+.brand{display:flex;align-items:center;gap:10px}
+.ff-mark{width:30px;height:30px;border:2px solid var(--white);border-radius:3px;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;font-family:'EB Garamond',serif;font-size:.8rem;font-weight:600;color:var(--white)}
+.ff-mark::after{content:'';position:absolute;inset:2px;border:1px solid rgba(255,255,255,.25);border-radius:1px}
+.brand-name{font-family:'EB Garamond',serif;font-size:1rem;font-weight:500;line-height:1.2}
+.brand-sub{font-size:.56rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.as-of{font-size:.62rem;color:var(--silver);font-family:'IBM Plex Mono',monospace}
+.as-of strong{color:var(--gold)}
+.btn-upload{background:rgba(201,169,110,.1);border:1px solid var(--gold2);color:var(--gold);font-size:.63rem;font-weight:600;padding:.3rem .85rem;border-radius:3px;cursor:pointer;letter-spacing:.04em;text-transform:uppercase;transition:background .15s}
+.btn-upload:hover{background:rgba(201,169,110,.2)}
 
 /* ── PAGE ── */
-.page { padding: 1.25rem 1.5rem; max-width: 1300px; margin: 0 auto; }
+.page{padding:1.1rem 1.5rem;max-width:1300px;margin:0 auto}
+.sec{font-size:.56rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:1.75rem 0 .75rem;padding-bottom:.35rem;border-bottom:1px solid var(--navy4);display:flex;align-items:center;gap:8px}
+.sec:first-of-type{margin-top:0}
+.sec-rule{width:16px;height:1.5px;background:var(--gold2);flex-shrink:0}
 
-/* ── SOURCE STATUS BAR ── */
-.status-bar {
-  display: flex;
-  gap: .5rem;
-  margin-bottom: 1.25rem;
-  flex-wrap: wrap;
-}
-.src-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--navy2);
-  border: 1px solid var(--navy4);
-  border-radius: 3px;
-  padding: .35rem .75rem;
-  font-size: .62rem;
-  color: var(--silver);
-  flex: 1;
-  min-width: 200px;
-}
-.src-chip .dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dot-live    { background: var(--how); }
-.dot-manual  { background: var(--gold); }
-.dot-failed  { background: var(--huw); }
-.dot-pending { background: var(--dim); }
-.src-chip .firm { font-weight: 600; color: var(--white); margin-right: 2px; }
-.src-chip .date { font-family: 'IBM Plex Mono', monospace; color: var(--gold); }
+/* ── SOURCE STATUS ── */
+.src-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-bottom:1.1rem}
+.src-card{background:var(--navy2);border:1px solid var(--navy4);border-radius:4px;padding:.75rem .9rem;cursor:pointer;transition:border-color .15s}
+.src-card:hover{border-color:var(--navy5)}
+.src-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem}
+.src-firm{font-size:.63rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.c-ndr{color:#5B8EC4}.c-bca{color:var(--gold)}.c-blk{color:#7FBFCF}
+.src-badge{font-size:.56rem;font-weight:700;padding:2px 7px;border-radius:2px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.b-ready{background:rgba(34,197,94,.12);color:var(--how);border:1px solid rgba(34,197,94,.25)}
+.b-pending{background:rgba(71,95,122,.18);color:var(--dim);border:1px solid rgba(71,95,122,.3)}
+.b-error{background:rgba(239,68,68,.1);color:var(--huw);border:1px solid rgba(239,68,68,.25)}
+.src-meta{font-size:.59rem;color:var(--silver);line-height:1.5}
+.src-meta span{color:var(--dim)}
+.src-hint{font-size:.56rem;color:var(--dim);margin-top:.3rem;font-style:italic}
 
-/* ── SECTION HEADER ── */
-.section {
-  font-size: .58rem;
-  font-weight: 700;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--dim);
-  margin: 1.75rem 0 .85rem;
-  padding-bottom: .4rem;
-  border-bottom: 1px solid var(--navy4);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.section:first-of-type { margin-top: 0; }
-.section-rule {
-  width: 18px; height: 1.5px;
-  background: var(--gold2);
-  flex-shrink: 0;
-}
+/* ── METHODOLOGY BOX ── */
+.method-box{background:rgba(201,169,110,.04);border:1px solid rgba(201,169,110,.13);border-left:3px solid var(--gold2);border-radius:0 3px 3px 0;padding:.75rem 1rem;margin-bottom:1.1rem;font-size:.62rem;color:var(--silver);line-height:1.8}
+.method-box strong{color:var(--white)}
+.method-box code{font-family:'IBM Plex Mono',monospace;font-size:.57rem;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:2px;color:var(--gold)}
+.method-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;margin-top:.65rem}
+.method-block{background:rgba(255,255,255,.02);border-radius:3px;padding:.6rem .75rem}
+.method-block-title{font-size:.57rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold2);margin-bottom:.35rem}
+.method-formula{font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--silver);line-height:1.9}
 
-/* ══════════════════════════════════════════════════════
-   SCORING LEGEND
-   ══════════════════════════════════════════════════════ */
-.legend-card {
-  background: var(--navy2);
-  border: 1px solid var(--navy4);
-  border-radius: 4px;
-  padding: .85rem 1rem;
-  margin-bottom: 1.25rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  align-items: flex-start;
-}
-.legend-block { flex: 1; min-width: 220px; }
-.legend-title {
-  font-size: .6rem;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--gold);
-  margin-bottom: .55rem;
-}
-.legend-rows { display: flex; flex-direction: column; gap: .3rem; }
-.legend-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: .67rem;
-  color: var(--silver);
-}
-.legend-badge {
-  min-width: 90px;
-  text-align: center;
-  padding: 1px 8px;
-  border-radius: 2px;
-  font-weight: 700;
-  font-size: .62rem;
-  flex-shrink: 0;
-}
-.b-how { background: rgba(34,197,94,.15); color: var(--how); border: 1px solid rgba(34,197,94,.3); }
-.b-ow  { background: rgba(74,222,128,.1);  color: var(--ow);  border: 1px solid rgba(74,222,128,.2); }
-.b-mw  { background: rgba(139,163,190,.1); color: var(--mw);  border: 1px solid rgba(139,163,190,.2); }
-.b-uw  { background: rgba(248,113,113,.1); color: var(--uw);  border: 1px solid rgba(248,113,113,.2); }
-.b-huw { background: rgba(239,68,68,.15);  color: var(--huw); border: 1px solid rgba(239,68,68,.3); }
-.b-na  { background: rgba(55,65,81,.3);    color: var(--dim); border: 1px solid rgba(55,65,81,.5); }
-.b-con-sbull { background: rgba(34,197,94,.2);  color: var(--how); border: 1px solid rgba(34,197,94,.4); }
-.b-con-bull  { background: rgba(74,222,128,.12); color: var(--ow);  border: 1px solid rgba(74,222,128,.25); }
-.b-con-neu   { background: rgba(139,163,190,.1); color: var(--mw);  border: 1px solid rgba(139,163,190,.2); }
-.b-con-bear  { background: rgba(248,113,113,.12);color: var(--uw);  border: 1px solid rgba(248,113,113,.25); }
-.b-con-sbear { background: rgba(239,68,68,.2);   color: var(--huw); border: 1px solid rgba(239,68,68,.4); }
+/* ── TABLES ── */
+.tbl-wrap{background:var(--navy2);border:1px solid var(--navy4);border-radius:4px;overflow:auto;margin-bottom:1.4rem}
+table{width:100%;border-collapse:collapse;min-width:640px}
+thead tr{background:var(--navy3)}
+th{padding:.5rem .85rem;text-align:left;font-size:.56rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);white-space:nowrap;border-bottom:1px solid var(--navy5)}
+th.c{text-align:center}
+td{padding:.62rem .85rem;border-bottom:1px solid var(--navy4);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,.01)}
+.asset-name{font-weight:500;color:var(--white);font-size:.76rem}
+.asset-sub{font-size:.59rem;color:var(--silver);margin-top:1px}
 
-/* ══════════════════════════════════════════════════════
-   MAIN TABLES
-   ══════════════════════════════════════════════════════ */
-.table-wrap {
-  background: var(--navy2);
-  border: 1px solid var(--navy4);
-  border-radius: 4px;
-  overflow: auto;
-  margin-bottom: 1.5rem;
-}
-table { width: 100%; border-collapse: collapse; min-width: 700px; }
-thead tr { background: var(--navy3); }
-th {
-  padding: .55rem 1rem;
-  text-align: left;
-  font-size: .58rem;
-  font-weight: 700;
-  letter-spacing: .09em;
-  text-transform: uppercase;
-  color: var(--dim);
-  white-space: nowrap;
-  border-bottom: 1px solid var(--navy5);
-}
-th.c { text-align: center; }
-td {
-  padding: .65rem 1rem;
-  border-bottom: 1px solid var(--navy4);
-  vertical-align: middle;
-  font-size: .78rem;
-}
-tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover { background: rgba(255,255,255,.012); }
-.asset-name { font-weight: 500; color: var(--white); }
-.asset-sub  { font-size: .62rem; color: var(--silver); margin-top: 1px; }
+/* ── SIGNAL BADGES ── */
+.sig{display:inline-flex;align-items:center;justify-content:center;padding:3px 10px;border-radius:2px;font-size:.63rem;font-weight:700;white-space:nowrap;min-width:92px;cursor:default}
+.sig-HOW{background:rgba(34,197,94,.14);color:var(--how);border:1px solid rgba(34,197,94,.28)}
+.sig-OW{background:rgba(74,222,128,.09);color:var(--ow);border:1px solid rgba(74,222,128,.2)}
+.sig-MW{background:rgba(139,163,190,.09);color:var(--mw);border:1px solid rgba(139,163,190,.18)}
+.sig-UW{background:rgba(248,113,113,.09);color:var(--uw);border:1px solid rgba(248,113,113,.2)}
+.sig-HUW{background:rgba(239,68,68,.14);color:var(--huw);border:1px solid rgba(239,68,68,.28)}
+.sig-NC{background:rgba(55,65,81,.22);color:var(--dim);border:1px solid rgba(55,65,81,.35);font-weight:400;font-style:italic}
 
-/* ── Signal badge ── */
-.sig {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3px 10px;
-  border-radius: 2px;
-  font-size: .67rem;
-  font-weight: 700;
-  white-space: nowrap;
-  min-width: 100px;
-}
+/* ── TOOLTIP ── */
+.cell-tip{position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:2px}
+.tip-sub{font-size:.55rem;font-family:'IBM Plex Mono',monospace;color:var(--dim)}
+.tip-sub.pos{color:rgba(74,222,128,.65)}.tip-sub.neg{color:rgba(248,113,113,.65)}
+.tip-popup{display:none;position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);background:var(--navy3);border:1px solid var(--navy5);border-radius:3px;padding:.55rem .75rem;font-size:.6rem;line-height:1.8;white-space:nowrap;z-index:200;min-width:210px;color:var(--silver);box-shadow:0 4px 18px rgba(0,0,0,.4)}
+.tip-popup strong{color:var(--white);display:block;margin-bottom:2px;font-size:.63rem}
+.tip-row{display:flex;justify-content:space-between;gap:1.25rem}
+.tip-key{color:var(--dim)}.tip-val{font-family:'IBM Plex Mono',monospace;color:var(--white)}
+.tip-active-pos{color:var(--ow)}.tip-active-neg{color:var(--uw)}
+.tip-mode{font-size:.55rem;color:var(--dim);margin-top:3px;font-style:italic}
+.cell-tip:hover .tip-popup{display:block}
 
-/* ── Active weight sub-line under badge ── */
-.sig-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.active-wt {
-  font-size: .57rem;
-  font-family: 'IBM Plex Mono', monospace;
-  color: var(--dim);
-}
-.active-wt.pos { color: rgba(74,222,128,.7); }
-.active-wt.neg { color: rgba(248,113,113,.7); }
+/* ── CONSENSUS ── */
+.con-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
+.con-bars{display:flex;align-items:flex-end;gap:2px;height:14px}
+.con-bar{width:6px;border-radius:1px}
 
-/* ── Consensus badge ── */
-.con-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.con-bars { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
-.con-bar  { width: 6px; border-radius: 1px; }
+/* ── TREND ── */
+.trend-dots{display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:2px}
+.trend-dot{width:7px;height:7px;border-radius:50%}
+.trend-arrow{font-size:.68rem;font-weight:700}
+.t-up{color:var(--how)}.t-dn{color:var(--huw)}.t-flat{color:var(--dim)}
 
-/* ── Trend cell ── */
-.trend-cell { text-align: center; }
-.trend-dots { display: flex; align-items: center; justify-content: center; gap: 3px; }
-.trend-dot  { width: 8px; height: 8px; border-radius: 50%; }
-.trend-arrow {
-  font-size: .7rem;
-  font-weight: 700;
-  margin-top: 2px;
-}
-.t-up   { color: var(--how); }
-.t-dn   { color: var(--huw); }
-.t-flat { color: var(--dim); }
+/* ── LEGEND ── */
+.legend-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.1rem;align-items:center}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:.59rem;color:var(--dim)}
 
-/* ── No data row ── */
-.no-data { color: var(--dim); font-style: italic; font-size: .72rem; }
+/* ── HISTORY ── */
+.hist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.65rem;margin-bottom:1.4rem}
+.hist-card{background:var(--navy2);border:1px solid var(--navy4);border-radius:4px;padding:.75rem .85rem}
+.hist-card-name{font-size:.68rem;font-weight:600;color:var(--white);margin-bottom:.45rem;padding-bottom:.35rem;border-bottom:1px solid var(--navy4)}
+.hist-tbl{width:100%;border-collapse:collapse}
+.hist-tbl th{font-size:.52rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);padding:2px 4px;text-align:center}
+.hist-tbl td{padding:3px 4px;text-align:center;font-size:.63rem}
+.hist-month{text-align:left!important;color:var(--silver);font-family:'IBM Plex Mono',monospace;font-size:.57rem!important}
 
-/* ── Not covered badge ── */
-.nc { display: inline-block; padding: 2px 6px; border-radius: 2px;
-      font-size: .6rem; color: var(--dim);
-      background: rgba(55,65,81,.3); border: 1px solid rgba(55,65,81,.5); }
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(5,11,20,.85);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal-bg.hidden{display:none}
+.modal{background:var(--navy2);border:1px solid var(--navy5);border-radius:5px;padding:1.6rem;width:100%;max-width:540px}
+.modal-title{font-family:'EB Garamond',serif;font-size:1.08rem;font-weight:500;margin-bottom:.2rem}
+.modal-sub{font-size:.62rem;color:var(--silver);margin-bottom:1.1rem;line-height:1.65}
+.src-tabs{display:flex;gap:3px;margin-bottom:1rem}
+.src-tab{flex:1;padding:.35rem;border-radius:3px;font-size:.62rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;text-align:center;cursor:pointer;background:var(--navy3);border:1px solid var(--navy4);color:var(--silver);transition:all .15s}
+.src-tab.active{border-color:var(--gold2);color:var(--gold);background:rgba(201,169,110,.08)}
+.drop-zone{border:1.5px dashed var(--navy5);border-radius:4px;padding:2rem 1rem;text-align:center;cursor:pointer;transition:all .15s}
+.drop-zone:hover,.drop-zone.over{border-color:var(--gold2);background:rgba(201,169,110,.04)}
+.drop-icon{font-size:1.6rem;margin-bottom:.4rem;opacity:.45}
+.drop-lbl{font-size:.76rem;font-weight:500;color:var(--silver);margin-bottom:.25rem}
+.drop-hint{font-size:.6rem;color:var(--dim)}
+.file-input{display:none}
+.src-guide{font-size:.6rem;color:var(--dim);line-height:1.7;margin-top:.85rem;padding-top:.7rem;border-top:1px solid var(--navy4)}
+.src-guide strong{color:var(--silver)}
+.modal-foot{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.1rem}
+.btn{padding:.38rem .95rem;border-radius:3px;font-size:.68rem;font-weight:600;cursor:pointer;border:none;font-family:inherit;letter-spacing:.03em;transition:opacity .15s}
+.btn:hover{opacity:.82}
+.btn-ghost{background:transparent;border:1px solid var(--navy5);color:var(--silver)}
+.btn-gold{background:var(--gold2);color:var(--navy)}
+.parsing{display:none;text-align:center;padding:1.75rem 0}
+.spin{width:26px;height:26px;border:2.5px solid var(--navy5);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto .65rem}
+.parse-lbl{font-size:.74rem;color:var(--silver)}
+.parse-detail{font-size:.6rem;color:var(--dim);margin-top:.25rem}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* ══════════════════════════════════════════════════════
-   TREND HISTORY SECTION
-   ══════════════════════════════════════════════════════ */
-.history-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: .85rem;
-  margin-bottom: 1.5rem;
-}
-.history-card {
-  background: var(--navy2);
-  border: 1px solid var(--navy4);
-  border-radius: 4px;
-  padding: .85rem 1rem;
-}
-.history-card-name {
-  font-size: .7rem;
-  font-weight: 600;
-  color: var(--white);
-  margin-bottom: .6rem;
-  padding-bottom: .4rem;
-  border-bottom: 1px solid var(--navy4);
-}
-.history-table { width: 100%; border-collapse: collapse; }
-.history-table th {
-  font-size: .55rem;
-  font-weight: 600;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  color: var(--dim);
-  padding: 2px 4px;
-  text-align: center;
-  border-bottom: none;
-}
-.history-table td {
-  padding: 3px 4px;
-  text-align: center;
-  border-bottom: none;
-  font-size: .67rem;
-}
-.month-label {
-  text-align: left !important;
-  color: var(--silver);
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: .6rem !important;
-}
+/* ── TOAST ── */
+.toast{position:fixed;bottom:1.4rem;right:1.4rem;background:var(--navy3);border:1px solid var(--navy5);border-radius:4px;padding:.6rem .95rem;font-size:.7rem;color:var(--white);z-index:600;opacity:0;transform:translateY(6px);transition:all .22s;pointer-events:none;max-width:320px}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{border-color:rgba(34,197,94,.35);color:var(--how)}
+.toast.err{border-color:rgba(239,68,68,.35);color:var(--huw)}
 
-/* ── Methodology note ── */
-.method-box {
-  background: rgba(201,169,110,.05);
-  border: 1px solid rgba(201,169,110,.15);
-  border-left: 3px solid var(--gold2);
-  border-radius: 0 4px 4px 0;
-  padding: .85rem 1rem;
-  margin-bottom: 1.5rem;
-  font-size: .65rem;
-  color: var(--silver);
-  line-height: 1.75;
-}
-.method-box strong { color: var(--white); }
-.method-box code {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: .6rem;
-  background: rgba(255,255,255,.06);
-  padding: 1px 5px;
-  border-radius: 2px;
-  color: var(--gold);
-}
+/* ── EMPTY ── */
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--dim)}
+.empty-icon{font-size:1.75rem;margin-bottom:.45rem;opacity:.4}
+.empty-lbl{font-size:.75rem;color:var(--silver);margin-bottom:.3rem;font-weight:500}
+.empty-hint{font-size:.61rem;line-height:1.7}
 
-/* ── Footer ── */
-.footer {
-  margin-top: 2rem;
-  padding-top: .85rem;
-  border-top: 1px solid var(--navy4);
-  font-size: .58rem;
-  color: var(--dim);
-  line-height: 1.8;
-}
-.footer strong { color: var(--silver); }
-
-/* ── Responsive ── */
-@media(max-width: 800px) {
-  .legend-card { flex-direction: column; }
-  .topbar { flex-direction: column; align-items: flex-start; }
-}
+@media(max-width:840px){.src-bar,.method-grid{grid-template-columns:1fr}.topbar{flex-direction:column;align-items:flex-start}}
 </style>
 </head>
 <body>
 
-<!-- ══ TOP BAR ══ -->
 <div class="topbar">
   <div class="brand">
     <div class="ff-mark" aria-hidden="true">FF</div>
-    <div class="brand-text">
-      <div class="name">Founders Financial</div>
-      <div class="sub">Investment Committee — Positioning Dashboard</div>
+    <div>
+      <div class="brand-name">Founders Financial</div>
+      <div class="brand-sub">Investment Committee · Positioning Dashboard</div>
     </div>
   </div>
   <div class="topbar-right">
-    <div class="as-of" id="as-of-label">Loading data…</div>
+    <div class="as-of" id="as-of-label">No data loaded</div>
+    <button class="btn-upload" onclick="openModal()">↑ Upload PDF</button>
   </div>
 </div>
 
 <div class="page">
 
-  <!-- ══ SOURCE STATUS BAR ══ -->
-  <div class="status-bar" id="status-bar">
-    <div class="src-chip">
-      <div class="dot dot-pending"></div>
-      <span>Loading sources…</span>
+  <!-- SOURCE STATUS -->
+  <div class="src-bar">
+    <div class="src-card" onclick="openModal('ndr')">
+      <div class="src-head"><span class="src-firm c-ndr">NDR House Views</span><span class="src-badge b-pending" id="badge-ndr">No PDF</span></div>
+      <div class="src-meta" id="meta-ndr"><span>Click to upload</span></div>
+      <div class="src-hint">ned-davisresearch.com → House Views → print/download PDF</div>
+    </div>
+    <div class="src-card" onclick="openModal('bca')">
+      <div class="src-head"><span class="src-firm c-bca">BCA GIS FullView</span><span class="src-badge b-pending" id="badge-bca">No PDF</span></div>
+      <div class="src-meta" id="meta-bca"><span>Click to upload</span></div>
+      <div class="src-hint">bcaresearch.com → GIS FullView Portfolio → download PDF</div>
+    </div>
+    <div class="src-card" onclick="openModal('blk')">
+      <div class="src-head"><span class="src-firm c-blk">BlackRock 60/40 ETF</span><span class="src-badge b-pending" id="badge-blk">No PDF</span></div>
+      <div class="src-meta" id="meta-blk"><span>Click to upload</span></div>
+      <div class="src-hint">Target Allocation ETF monthly PDF (T&amp;O…) — 60/40 column · benchmark = BLK stated index</div>
     </div>
   </div>
 
-  <!-- ══ SCORING METHODOLOGY ══ -->
+  <!-- METHODOLOGY -->
   <div class="method-box">
-    <strong>Scoring methodology — universal across all three sources.</strong>
-    NDR and BCA provide explicit position and benchmark weights.
-    Active weight = position % − benchmark %. That active weight determines the signal.
-    BlackRock BII provides directional signals which are mapped directly.
-    <br>
-    <strong>Formula:</strong>
-    <code>Active &gt; +5pp → Heavy OW (+2)</code>
-    <code>+2 to +5pp → OW (+1)</code>
-    <code>±2pp → Market Weight (0)</code>
-    <code>−2 to −5pp → UW (−1)</code>
-    <code>&lt; −5pp → Heavy UW (−2)</code>
-    <br>
-    <strong>Consensus:</strong> Average score of all firms that cover the asset.
-    Score &gt;1.5 = Strong Bullish · 0.5–1.5 = Bullish · ±0.5 = Neutral · −0.5 to −1.5 = Bearish · &lt;−1.5 = Strong Bearish.
-    Assets not covered by a firm are excluded from that firm's contribution to consensus.
-  </div>
-
-  <!-- ══ LEGEND ══ -->
-  <div class="section"><span class="section-rule"></span>Signal Reference</div>
-  <div class="legend-card">
-    <div class="legend-block">
-      <div class="legend-title">Individual Firm Signals</div>
-      <div class="legend-rows">
-        <div class="legend-row"><span class="legend-badge b-how">Heavy OW</span> Active weight &gt; +5pp above benchmark</div>
-        <div class="legend-row"><span class="legend-badge b-ow">Overweight</span> Active weight +2pp to +5pp above benchmark</div>
-        <div class="legend-row"><span class="legend-badge b-mw">Market Weight</span> Active weight within ±2pp of benchmark</div>
-        <div class="legend-row"><span class="legend-badge b-uw">Underweight</span> Active weight −2pp to −5pp below benchmark</div>
-        <div class="legend-row"><span class="legend-badge b-huw">Heavy UW</span> Active weight &lt; −5pp below benchmark</div>
-        <div class="legend-row"><span class="legend-badge b-na">Not Covered</span> Source does not publish a view on this asset</div>
+    <strong>Mathematical scoring schema — identical for every source, every asset, every month.</strong>
+    Two modes depending on what the source provides:
+    <div class="method-grid">
+      <div class="method-block">
+        <div class="method-block-title">Mode A — Weighted (position &amp; benchmark available)</div>
+        <div class="method-formula">
+          active = position% − benchmark%<br>
+          active &gt; +5.0pp  →  Heavy OW  (+2)<br>
+          active &gt; +2.0pp  →  Overweight  (+1)<br>
+          active ≥ −2.0pp  →  Market Weight  (0)<br>
+          active ≥ −5.0pp  →  Underweight  (−1)<br>
+          active &lt; −5.0pp  →  Heavy UW  (−2)<br>
+          <br>
+          NDR: stocks/bonds/cash + regional bonds<br>
+          BCA: all assets (position &amp; benchmark given)<br>
+          BLK: ETF weight vs BLK's own stated benchmark (42% MSCI ACWI + 18% MSCI USA + 38% Bloomberg Universal + 2% T-Bill)
+        </div>
+      </div>
+      <div class="method-block">
+        <div class="method-block-title">Mode B — Directional (view label only)</div>
+        <div class="method-formula">
+          OVER / BULLISH  →  Overweight  (+1)<br>
+          MARKET / NEUTRAL  →  Market Weight  (0)<br>
+          UNDER / BEARISH  →  Underweight  (−1)<br>
+          <br>
+          NDR: equity cap/style, sectors, gold,<br>
+          &nbsp;&nbsp;oil, EM debt, HY (no weights given)<br>
+          BCA: macro overlays (directional only)<br>
+          BLK: n/a (always Mode A)<br>
+          <br>
+          Hover any signal → see the raw data<br>
+          behind the score
+        </div>
+      </div>
+      <div class="method-block">
+        <div class="method-block-title">Consensus &amp; BlackRock Benchmark</div>
+        <div class="method-formula">
+          Consensus = avg(scores of covering firms)<br>
+          "Not Covered" excluded — not zero<br>
+          <br>
+          BLK stated-bm assets: pos − stated bm<br>
+          (42% ACWI+18% USA+38% Universal+2% T-Bill)<br>
+          BLK sub-asset classes (no stated bm):<br>
+          active = current month % − prior month %<br>
+          prior = current − change column in PDF<br>
+          Affects: Large-Cap, Growth, Value, HY<br>
+          <br>
+          &gt;+1.5 → Strong Bullish<br>
+          +0.5 to +1.5 → Bullish<br>
+          ±0.5 → Neutral<br>
+          −0.5 to −1.5 → Bearish<br>
+          &lt;−1.5 → Strong Bearish
+        </div>
       </div>
     </div>
-    <div class="legend-block">
-      <div class="legend-title">Consensus Signal (avg. score of covering firms)</div>
-      <div class="legend-rows">
-        <div class="legend-row"><span class="legend-badge b-con-sbull">Strong Bullish</span> Average score &gt; +1.5</div>
-        <div class="legend-row"><span class="legend-badge b-con-bull">Bullish</span> Average score +0.5 to +1.5</div>
-        <div class="legend-row"><span class="legend-badge b-con-neu">Neutral</span> Average score −0.5 to +0.5</div>
-        <div class="legend-row"><span class="legend-badge b-con-bear">Bearish</span> Average score −0.5 to −1.5</div>
-        <div class="legend-row"><span class="legend-badge b-con-sbear">Strong Bearish</span> Average score &lt; −1.5</div>
-      </div>
-    </div>
-    <div class="legend-block">
-      <div class="legend-title">Trend Arrow (3-month direction)</div>
-      <div class="legend-rows">
-        <div class="legend-row"><span style="color:var(--how);font-weight:700">▲ Improving</span> Consensus score rising over 3 months</div>
-        <div class="legend-row"><span style="color:var(--huw);font-weight:700">▼ Deteriorating</span> Consensus score falling over 3 months</div>
-        <div class="legend-row"><span style="color:var(--dim);font-weight:700">— Stable</span> No meaningful change in 3 months</div>
-      </div>
-    </div>
   </div>
 
-  <!-- ══ TABLE 1: PRIMARY ASSET ALLOCATION ══ -->
-  <div class="section"><span class="section-rule"></span>Table 1 — Primary Asset Allocation</div>
-  <div class="table-wrap">
-    <table id="primary-table" aria-label="Primary asset allocation comparison">
-      <thead><tr>
-        <th>Asset</th>
-        <th class="c">NDR<br><span style="font-weight:400;font-size:.52rem;color:var(--dim)">House Views</span></th>
-        <th class="c">BCA GIS<br><span style="font-weight:400;font-size:.52rem;color:var(--dim)">FullView Portfolio</span></th>
-        <th class="c">BlackRock BII<br><span style="font-weight:400;font-size:.52rem;color:var(--dim)">Asset Class Views</span></th>
-        <th class="c">Consensus</th>
-        <th class="c">3M Trend</th>
-      </tr></thead>
-      <tbody id="primary-tbody">
-        <tr><td colspan="6" class="no-data" style="text-align:center;padding:2rem">Loading data…</td></tr>
-      </tbody>
-    </table>
+  <!-- TABLE 1: PRIMARY -->
+  <div class="sec"><span class="sec-rule"></span>Table 1 — Primary Asset Allocation</div>
+  <div class="tbl-wrap"><table aria-label="Primary asset allocation">
+    <thead><tr>
+      <th style="width:200px">Asset</th>
+      <th class="c" style="color:#5B8EC4">NDR House Views<br><span style="font-weight:400;font-size:.5rem;color:var(--dim)">Mode A where available</span></th>
+      <th class="c" style="color:var(--gold)">BCA GIS FullView<br><span style="font-weight:400;font-size:.5rem;color:var(--dim)">Mode A — position &amp; benchmark</span></th>
+      <th class="c" style="color:#7FBFCF">BlackRock 60/40 ETF<br><span style="font-weight:400;font-size:.5rem;color:var(--dim)">Mode A — ETF weight vs avg benchmark</span></th>
+      <th class="c">Consensus</th>
+      <th class="c">3M Trend</th>
+    </tr></thead>
+    <tbody id="tbody-primary"></tbody>
+  </table></div>
+
+  <!-- TABLE 2: EQUITIES -->
+  <div class="sec"><span class="sec-rule"></span>Table 2 — Equities</div>
+  <div class="tbl-wrap"><table aria-label="Equities sub-asset classes">
+    <thead><tr>
+      <th style="width:210px">Asset / Sub-Asset Class</th>
+      <th class="c" style="color:#5B8EC4">NDR<br><span style="font-weight:400;font-size:.5rem;color:var(--dim)">Mode A (regional) / Mode B (cap,style)</span></th>
+      <th class="c" style="color:var(--gold)">BCA GIS<br><span style="font-weight:400;font-size:.5rem;color:var(--dim)">Mode A + overlay signals</span></th>
+      <th class="c" style="color:#7FBFCF">BlackRock 60/40<br><span style="font-weight:400;font-size:.5rem;color:var(--dim)">Mode A — ETF weights</span></th>
+      <th class="c">Consensus</th>
+      <th class="c">3M Trend</th>
+    </tr></thead>
+    <tbody id="tbody-equities"></tbody>
+  </table></div>
+
+  <!-- TABLE 3: FIXED INCOME -->
+  <div class="sec"><span class="sec-rule"></span>Table 3 — Fixed Income</div>
+  <div class="tbl-wrap"><table aria-label="Fixed income sub-asset classes">
+    <thead><tr>
+      <th style="width:210px">Asset / Sub-Asset Class</th>
+      <th class="c" style="color:#5B8EC4">NDR</th>
+      <th class="c" style="color:var(--gold)">BCA GIS</th>
+      <th class="c" style="color:#7FBFCF">BlackRock 60/40</th>
+      <th class="c">Consensus</th>
+      <th class="c">3M Trend</th>
+    </tr></thead>
+    <tbody id="tbody-fixed"></tbody>
+  </table></div>
+
+  <!-- TABLE 4: CASH & ALTERNATIVES -->
+  <div class="sec"><span class="sec-rule"></span>Table 4 — Cash &amp; Alternatives</div>
+  <div class="tbl-wrap"><table aria-label="Cash and alternatives">
+    <thead><tr>
+      <th style="width:210px">Asset / Sub-Asset Class</th>
+      <th class="c" style="color:#5B8EC4">NDR</th>
+      <th class="c" style="color:var(--gold)">BCA GIS</th>
+      <th class="c" style="color:#7FBFCF">BlackRock 60/40</th>
+      <th class="c">Consensus</th>
+      <th class="c">3M Trend</th>
+    </tr></thead>
+    <tbody id="tbody-alts"></tbody>
+  </table></div>
+
+  <!-- LEGEND -->
+  <div class="legend-row">
+    <span class="leg-item"><span class="sig sig-HOW">Heavy OW</span>&nbsp;Active &gt;+5pp (Mode A only)</span>
+    <span class="leg-item"><span class="sig sig-OW">Overweight</span>&nbsp;+2 to +5pp / OVER label</span>
+    <span class="leg-item"><span class="sig sig-MW">Market Weight</span>&nbsp;±2pp / MARKET·NEUTRAL</span>
+    <span class="leg-item"><span class="sig sig-UW">Underweight</span>&nbsp;−2 to −5pp / UNDER label</span>
+    <span class="leg-item"><span class="sig sig-HUW">Heavy UW</span>&nbsp;&lt;−5pp (Mode A only)</span>
+    <span class="leg-item"><span class="sig sig-NC">Not Covered</span>&nbsp;excluded from consensus</span>
+    <span style="font-size:.58rem;color:var(--dim);margin-left:4px">← hover any signal for raw data detail</span>
   </div>
 
-  <!-- ══ TABLE 2: SUB-ASSET CLASS ALLOCATION ══ -->
-  <div class="section"><span class="section-rule"></span>Table 2 — Sub-Asset Class Tactical Allocation</div>
-  <div class="table-wrap">
-    <table id="sub-table" aria-label="Sub-asset class tactical allocation comparison">
-      <thead><tr>
-        <th>Asset / Sub-Asset Class</th>
-        <th class="c">NDR<br><span style="font-weight:400;font-size:.52rem;color:var(--dim)">House Views</span></th>
-        <th class="c">BCA GIS<br><span style="font-weight:400;font-size:.52rem;color:var(--dim)">FullView Portfolio</span></th>
-        <th class="c">BlackRock BII<br><span style="font-weight:400;font-size:.52rem;color:var(--dim)">Asset Class Views</span></th>
-        <th class="c">Consensus</th>
-        <th class="c">3M Trend</th>
-      </tr></thead>
-      <tbody id="sub-tbody">
-        <tr><td colspan="6" class="no-data" style="text-align:center;padding:2rem">Loading data…</td></tr>
-      </tbody>
-    </table>
+  <!-- HISTORY -->
+  <div class="sec"><span class="sec-rule"></span>12-Month Consensus History</div>
+  <div class="hist-grid" id="hist-grid">
+    <div style="color:var(--dim);font-size:.68rem;font-style:italic;padding:.4rem">History builds automatically each month after upload.</div>
   </div>
 
-  <!-- ══ TREND HISTORY ══ -->
-  <div class="section"><span class="section-rule"></span>12-Month Trend — Consensus Score History</div>
-  <div class="history-grid" id="history-grid">
-    <div class="history-card" style="color:var(--dim);font-size:.72rem;font-style:italic">
-      No history yet. History builds automatically after the first monthly update.
-    </div>
-  </div>
-
-  <!-- ══ FOOTER ══ -->
-  <div class="footer">
-    <strong>Sources:</strong>
-    NDR House Views — ndr.com (subscriber access, login via GitHub Actions) ·
-    BCA Global Investment Strategy FullView Portfolio — bcaresearch.com (subscriber access, login via GitHub Actions) ·
-    BlackRock BII Asset Class Views — blackrock.com/corporate/insights/blackrock-investment-institute/publications/outlook (public) ·
+  <!-- FOOTER -->
+  <div style="margin-top:1.75rem;padding-top:.8rem;border-top:1px solid var(--navy4);font-size:.58rem;color:var(--dim);line-height:1.85">
+    <strong style="color:var(--silver)">Sources:</strong>
+    NDR House Views — ned-davisresearch.com (subscriber) ·
+    BCA Global Investment Strategy FullView Portfolio — bcaresearch.com (subscriber) ·
+    BlackRock Target Allocation ETF 60/40 — monthly "T&amp;O…" PDF
     <br>
-    <strong>Scoring:</strong> NDR and BCA active weights calculated as position% minus their stated benchmark%.
-    BlackRock BII directional signals mapped: Overweight=+1, Neutral=0, Underweight=−1.
-    Consensus = unweighted average of scores for firms that cover each asset. Not covered = excluded from consensus.
+    <strong style="color:var(--silver)">NDR format:</strong>
+    Top-level assets (Stocks/Bonds/Cash) and Regional Bonds provide Position% and Benchmark% → Mode A.
+    Sub-assets (cap, style, sectors, gold, oil, EM debt) provide View label only → Mode B.
     <br>
-    <strong>Disclaimer:</strong> This dashboard is for internal investment committee use only. Not investment advice.
-    All views sourced from third-party research providers and represent those providers' published positions as of the date shown.
+    <strong style="color:var(--silver)">BCA format:</strong>
+    Asset Allocation table provides Position% and Benchmark% → Mode A for all rows.
+    Macro overlay trades provide directional signal → Mode B (gold, EM, small-cap).
+    <br>
+    <strong style="color:var(--silver)">BlackRock 60/40 ETF mapping (May 26 2026, T&amp;O0526-5526914):</strong>
+    US Eq=44% · Dev ex-US=7.5% · EM=4% · Sector=5.5% · US Treas=7% · IG Credit=23% · Intl FI=3% · Alts=3% · Gold=1% · Cash=2%
+    <br>
+    <strong style="color:var(--silver)">Disclaimer:</strong> Internal investment committee use only. Not investment advice.
   </div>
 </div>
 
+<!-- MODAL -->
+<div class="modal-bg hidden" id="modal-bg" onclick="bgClick(event)">
+  <div class="modal">
+    <div class="modal-title">Upload Research PDF</div>
+    <div class="modal-sub">Select the source, drop or browse to your PDF. Claude reads it and extracts all signals automatically.</div>
+    <div class="src-tabs">
+      <div class="src-tab" id="tab-ndr" onclick="setSrc('ndr')">NDR<br><span style="font-size:.5rem;font-weight:400">House Views</span></div>
+      <div class="src-tab" id="tab-bca" onclick="setSrc('bca')">BCA GIS<br><span style="font-size:.5rem;font-weight:400">FullView Portfolio</span></div>
+      <div class="src-tab" id="tab-blk" onclick="setSrc('blk')">BlackRock<br><span style="font-size:.5rem;font-weight:400">60/40 Target ETF</span></div>
+    </div>
+    <div id="upload-section">
+      <div class="drop-zone" id="dz" onclick="document.getElementById('fi').click()"
+           ondragover="dzOver(event)" ondragleave="dzLeave()" ondrop="dzDrop(event)">
+        <div class="drop-icon">📄</div>
+        <div class="drop-lbl">Drop PDF here or click to browse</div>
+        <div class="drop-hint" id="dz-hint">Select your NDR House Views PDF</div>
+      </div>
+      <input type="file" id="fi" class="file-input" accept=".pdf,application/pdf" onchange="fileChosen(event)"/>
+      <div class="src-guide">
+        <strong>NDR:</strong> ned-davisresearch.com → House Views → use browser print → Save as PDF. The PDF must contain the Global section with View/Position/Benchmark columns.<br>
+        <strong>BCA:</strong> bcaresearch.com → GIS FullView Portfolio → download the PDF showing the asset allocation table with Portfolio%/Benchmark%/Difference columns.<br>
+        <strong>BlackRock:</strong> Your advisor portal → Target Allocation ETF → monthly "Portfolio holdings, analytics &amp; insights" PDF (filename starts "T&amp;O…"). Use the 60/40 column.
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>
+    </div>
+    <div class="parsing" id="parsing-section">
+      <div class="spin"></div>
+      <div class="parse-lbl" id="parse-lbl">Reading PDF…</div>
+      <div class="parse-detail" id="parse-detail">Claude is extracting allocation data</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <script>
-/* ══════════════════════════════════════════════════════════════
-   DASHBOARD SCRIPT
-   Reads data/allocations.json and renders both tables.
-   All rendering logic is here — the data is in the JSON file.
-   ══════════════════════════════════════════════════════════════ */
+/*
+ ══════════════════════════════════════════════════════════════
+  SCORING — two modes, applied at render time, not at extract time.
+  All raw numbers are stored; scoring is computed from them.
 
-/* ── Signal scoring thresholds (NDR & BCA use active weight) ── */
-function scoreFromActiveWeight(aw) {
+  Mode A (weighted): score = f(position - benchmark)
+    >+5 → HOW(+2), >+2 → OW(+1), ≥-2 → MW(0), ≥-5 → UW(-1), <-5 → HUW(-2)
+
+  Mode B (directional): score = f(view label)
+    OVER/BULLISH → OW(+1), MARKET/NEUTRAL → MW(0), UNDER/BEARISH → UW(-1)
+
+  A signal is "not covered" if both mode A data and mode B label are absent.
+ ══════════════════════════════════════════════════════════════
+*/
+
+/* ── Scoring functions ── */
+function scoreAW(aw) {
   if (aw === null || aw === undefined) return null;
-  if (aw >  5)  return  2;   // Heavy Overweight
-  if (aw >  2)  return  1;   // Overweight
-  if (aw >= -2) return  0;   // Market Weight
-  if (aw >= -5) return -1;   // Underweight
-  return -2;                  // Heavy Underweight
+  if (aw >  5.0) return  2;
+  if (aw >  2.0) return  1;
+  if (aw >= -2.0) return  0;
+  if (aw >= -5.0) return -1;
+  return -2;
 }
-
-/* ── BlackRock BII maps text signal → score ── */
-function scoreFromBII(signal) {
-  if (!signal) return null;
-  const s = signal.toLowerCase();
-  if (s.includes('high conviction') && s.includes('over'))  return  2;
-  if (s.includes('high conviction') && s.includes('under')) return -2;
-  if (s.includes('overweight'))  return  1;
-  if (s.includes('underweight')) return -1;
-  if (s.includes('neutral'))     return  0;
+function scoreDir(view) {
+  if (!view) return null;
+  const v = view.toUpperCase();
+  if (['OVER','OVERWEIGHT','BULLISH'].some(x => v.includes(x))) return  1;
+  if (['UNDER','UNDERWEIGHT','BEARISH'].some(x => v.includes(x))) return -1;
+  if (['MARKET','NEUTRAL'].some(x => v.includes(x))) return 0;
   return null;
 }
-
-/* ── Score → signal label ── */
-function signalLabel(score) {
-  if (score === null) return null;
-  if (score >=  1.5) return 'Heavy OW';
-  if (score >=  0.5) return 'Overweight';
-  if (score >= -0.5) return 'Market Weight';
-  if (score >= -1.5) return 'Underweight';
-  return 'Heavy UW';
+/* Compute score for a firm's asset data:
+   Prefers Mode A (aw) if available, falls back to Mode B (view) */
+function computeScore(d) {
+  if (!d) return null;
+  if (d.aw !== null && d.aw !== undefined) return scoreAW(d.aw);
+  if (d.view) return scoreDir(d.view);
+  return null;
 }
-
-/* ── Score → CSS class ── */
-function sigClass(score) {
-  if (score === null) return 'b-na';
-  if (score >=  1.5) return 'b-how';
-  if (score >=  0.5) return 'b-ow';
-  if (score >= -0.5) return 'b-mw';
-  if (score >= -1.5) return 'b-uw';
-  return 'b-huw';
+function scoreLabel(s) {
+  const m = {2:{l:'Heavy OW',c:'sig-HOW'},1:{l:'Overweight',c:'sig-OW'},0:{l:'Market Weight',c:'sig-MW'},'-1':{l:'Underweight',c:'sig-UW'},'-2':{l:'Heavy UW',c:'sig-HUW'}};
+  return m[String(s)] || null;
 }
-
-/* ── Consensus score → label and class ── */
 function consensusLabel(avg) {
-  if (avg >  1.5) return { label: 'Strong Bullish', cls: 'b-con-sbull' };
-  if (avg >  0.5) return { label: 'Bullish',        cls: 'b-con-bull'  };
-  if (avg > -0.5) return { label: 'Neutral',         cls: 'b-con-neu'   };
-  if (avg > -1.5) return { label: 'Bearish',         cls: 'b-con-bear'  };
-  return                  { label: 'Strong Bearish', cls: 'b-con-sbear' };
+  if (avg >  1.5) return { l:'Strong Bullish', c:'sig-HOW' };
+  if (avg >  0.5) return { l:'Bullish',        c:'sig-OW'  };
+  if (avg > -0.5) return { l:'Neutral',        c:'sig-MW'  };
+  if (avg > -1.5) return { l:'Bearish',        c:'sig-UW'  };
+  return               { l:'Strong Bearish', c:'sig-HUW' };
 }
 
-/* ── Render a signal cell ── */
-function sigCell(score, activeWt) {
-  if (score === null) {
-    return '<td class="c"><span class="nc">Not Covered</span></td>';
-  }
-  const label = signalLabel(score);
-  const cls   = sigClass(score);
-  let wtLine = '';
-  if (activeWt !== null && activeWt !== undefined) {
-    const sign  = activeWt > 0 ? '+' : '';
-    const color = activeWt > 0.2 ? 'pos' : activeWt < -0.2 ? 'neg' : '';
-    wtLine = `<div class="active-wt ${color}">${sign}${activeWt.toFixed(1)}pp active</div>`;
-  }
-  return `<td class="c">
-    <div class="sig-wrap">
-      <span class="sig legend-badge ${cls}">${label}</span>
-      ${wtLine}
-    </div>
-  </td>`;
-}
+/* ── BlackRock 60/40 ETF positions (May 26 2026, T&O0526-5526914) ──
+   Current month holdings (60/40 column, "LATEST HOLDINGS" table).
+   These are the POSITION values used in Mode A scoring where a
+   stated benchmark exists, and used as "current" in MoM scoring. */
+const BLK_POS = {
+  equities:  61.0,  // US(44)+Intl(11.5)+Sector(5.5)
+  bonds:     33.0,  // US FI(30)+Intl FI(3)
+  cash:       2.0,
+  alts:       4.0,  // IALT(3)+IAU(1)
+  'us-eq':   44.0,  // all US equity ETFs
+  'dev-intl': 7.5,  // CORO+EFG+EFV
+  'em-eq':    4.0,  // IEMG
+  'us-lc':   19.0,  // IVV(16)+BLCR(3)
+  'us-gr':   10.0,  // IVW(7)+MTUM(3)
+  'us-val':   6.5,  // IVE
+  'us-treas': 7.0,  // GOVT(4)+TLH(3)
+  'ig-credit':23.0, // MBB(5)+IUSB(18)
+  'hy-bonds': 0.0,  // ICVT=0 in 60/40
+  'intl-debt':3.0,  // GGOV
+  'em-bonds': 0.0,  // not held
+  gold:       1.0,  // IAU
+  oil:        0.0,  // not held
+};
 
-/* ── Render consensus cell ── */
-function conCell(scores) {
-  const valid = scores.filter(s => s !== null);
-  if (valid.length === 0) {
-    return '<td class="c"><span class="nc">—</span></td>';
-  }
-  const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
-  const { label, cls } = consensusLabel(avg);
-  // Mini bar chart (one bar per firm, height = signal strength)
-  const colors = ['#5B8EC4', '#C9A96E', '#7FBFCF'];
-  const bars = scores.map((s, i) => {
-    if (s === null) return `<div class="con-bar" style="height:4px;background:var(--navy5)"></div>`;
-    const h  = 4 + Math.abs(s) * 4;
-    const bg = s > 0 ? 'var(--ow)' : s < 0 ? 'var(--uw)' : 'var(--mw)';
-    return `<div class="con-bar" style="height:${h}px;background:${bg}" title="Score: ${s > 0 ? '+' : ''}${s}"></div>`;
-  }).join('');
-  return `<td class="c">
-    <div class="con-wrap">
-      <div class="con-bars">${bars}</div>
-      <span class="sig legend-badge ${cls}" style="font-size:.6rem;min-width:90px">${label}</span>
-    </div>
-  </td>`;
-}
+/* ── Prior month holdings — derived from "CHANGES TO HOLDINGS" column ──
+   Prior month = Current month − Change
+   Source: T&O0526-5526914-EXP0826, "CHANGES TO HOLDINGS" table, 60/40 column.
 
-/* ── Render 3-month trend cell ── */
-function trendCell(history, assetId) {
-  if (!history || history.length < 2) {
-    return '<td class="c trend-cell"><span class="trend-arrow t-flat">—</span></td>';
-  }
-  // Get last 3 months of consensus scores for this asset
-  const recent = history.slice(-3).map(snap => {
-    const a = (snap.assets || []).find(x => x.id === assetId);
-    if (!a) return null;
-    const scores = [a.ndrScore, a.bcaScore, a.biiScore].filter(s => s !== null);
-    return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
-  }).filter(s => s !== null);
+   us-lc   : IVV change +6.5, BLCR change +0.5  → prior = 19.0 − 7.0  = 12.0%
+   us-gr   : IVW change  0.0, MTUM change −0.5  → prior = 10.0 − (−0.5) = 10.5%
+   us-val  : IVE change −1.0                    → prior =  6.5 − (−1.0) =  7.5%
+   hy-bonds: ICVT change 0.0 (already 0)        → prior =  0.0
 
-  if (recent.length < 2) {
-    return '<td class="c trend-cell"><span class="trend-arrow t-flat">—</span></td>';
-  }
+   MoM active weight = current − prior:
+   us-lc:    19.0 − 12.0 = +7.0pp  → Overweight  (+1)
+   us-gr:    10.0 − 10.5 = −0.5pp  → Market Weight (0)
+   us-val:    6.5 −  7.5 = −1.0pp  → Market Weight (0)
+   hy-bonds:  0.0 −  0.0 =  0.0pp  → Market Weight (0)
 
-  // Show last 3 dots (coloured by score) + arrow
-  const dots = recent.map(s => {
-    const bg = s > 0.5 ? 'var(--ow)' : s < -0.5 ? 'var(--uw)' : 'var(--mw)';
-    return `<div class="trend-dot" style="background:${bg}" title="Score: ${s.toFixed(2)}"></div>`;
-  }).join('');
+   When a new PDF is uploaded Claude extracts both current and change columns,
+   and the dashboard computes prior = current − change automatically.            */
+const BLK_POS_PRIOR = {
+  'us-lc':   12.0,  // prior month: IVV(9.5)+BLCR(2.5)
+  'us-gr':   10.5,  // prior month: IVW(7.0)+MTUM(3.5)
+  'us-val':   7.5,  // prior month: IVE(7.5)
+  'hy-bonds': 0.0,  // prior month: ICVT(0)
+};
 
-  const first = recent[0];
-  const last  = recent[recent.length - 1];
-  const delta = last - first;
-  let arrow = '', cls = '';
-  if (delta > 0.25)      { arrow = '▲'; cls = 't-up'; }
-  else if (delta < -0.25){ arrow = '▼'; cls = 't-dn'; }
-  else                    { arrow = '—'; cls = 't-flat'; }
+/* IDs that use MoM change as their active weight (no stated BLK sub-benchmark) */
+const BLK_MOM_IDS = new Set(['us-lc', 'us-gr', 'us-val', 'hy-bonds']);
 
-  return `<td class="c trend-cell">
-    <div class="trend-dots">${dots}</div>
-    <div class="trend-arrow ${cls}">${arrow}</div>
-  </td>`;
-}
+/*
+ ── BlackRock 60/40 STATED BENCHMARK ──────────────────────────────────
+ Source: BlackRock Target Allocation ETF PDF, page 2 (T&O0526-5526914)
+ "The benchmark for the 60/40 model portfolio is represented by:
+   42% MSCI ACWI Index
+   18% MSCI USA Index
+   38% Bloomberg U.S. Universal Index
+   2%  ICE BofAML US T-Bill 0-3 Month Index"
 
-/* ══════════════════════════════════════════════════════
-   TABLE DEFINITIONS
-   Asset classes for each table.
-   'id' must match the id in allocations.json.
-   If a firm doesn't cover an asset, its score will be null → "Not Covered".
-   ══════════════════════════════════════════════════════ */
+ Asset-class breakdowns derived from index compositions:
+   Equity sleeve (60% total):
+     MSCI ACWI (42%) + MSCI USA (18%) = 60% total equity
+     MSCI ACWI country weights → US ≈ 65%, DM ex-US ≈ 22%, EM ≈ 13%
+     Combined with MSCI USA tilt:
+       US Equity benchmark  = 42% × 0.65 + 18% = 45.3%  → use 45.0%
+       Dev ex-US benchmark  = 42% × 0.22         = 9.2%   → use 9.0%
+       EM benchmark         = 42% × 0.13         = 5.5%   → use 5.5%
+     Sub-cap/style: within US equity sleeve, approximate S&P 500 weights:
+       Large-Cap (S&P 500 = ~85% of US equity bm): 45 × 0.85 = 38.3% → use 38.0%
+       Growth (Russell 1000 Gr ≈ 55% of LC):       38 × 0.55 = 20.9% → use 20.0%
+       Value (Russell 1000 Va ≈ 45% of LC):        38 × 0.45 = 17.1% → use 17.0%
 
-/* Table 1: Primary */
-const PRIMARY_ASSETS = [
-  { id: 'equities', name: 'Equities',  sub: 'Total equity allocation' },
-  { id: 'bonds',    name: 'Bonds',     sub: 'Total fixed income allocation' },
-  { id: 'cash',     name: 'Cash',      sub: 'Cash & equivalents' },
-  { id: 'gold',     name: 'Gold',      sub: 'Precious metals' },
+   Fixed income sleeve (38% Bloomberg Universal):
+     Bloomberg U.S. Universal composition (approx):
+       US Treasuries        ≈ 37% of Universal → 38 × 0.37 = 14.1% → use 14.0%
+       US Agency/MBS        ≈ 27% of Universal → 38 × 0.27 = 10.3% → use 10.0%
+       IG Corporate         ≈ 24% of Universal → 38 × 0.24 =  9.1% → use  9.0%
+       High Yield           ≈  4% of Universal → 38 × 0.04 =  1.5% → use  1.5%
+       Int'l / Emerging     ≈  8% of Universal → 38 × 0.08 =  3.0% → use  3.0%
+     IG Credit (MBS + Corp) = 10.0 + 9.0 = 19.0%
+     Intl Debt              = 3.0%
+
+   Cash: 2% (T-Bill sleeve, stated directly)
+   Alternatives: 0% (not in benchmark)
+   Gold: 0% (not in benchmark)
+   Oil:  0% (not in benchmark)
+
+ These are BlackRock's own reference points. Active weight =
+   ETF holding % (from PDF 60/40 column) − benchmark below.
+ ─────────────────────────────────────────────────────────────────── */
+const BLK_STATED_BM = {
+  equities:   60.0,   // 42% MSCI ACWI + 18% MSCI USA
+  bonds:      38.0,   // Bloomberg U.S. Universal Index
+  cash:        2.0,   // ICE BofAML US T-Bill 0-3 Month
+  alts:        0.0,   // not in BLK benchmark
+  'us-eq':    45.0,   // ACWI US weight + MSCI USA tilt
+  'dev-intl':  9.0,   // ACWI developed ex-US weight
+  'em-eq':     5.5,   // ACWI emerging markets weight
+  // ── Sub-assets where BLK states a benchmark: use Mode A ──
+  'us-treas': 14.0,   // Treasury portion of Bloomberg Universal (38% × 37%)
+  'ig-credit':19.0,   // MBS + IG Corp portion of Bloomberg Universal (38% × 50%)
+  // ── Sub-assets where BLK does NOT state a benchmark:
+  //    active weight = current holding % − prior month holding %
+  //    (prior month = current − change column in ETF PDF)
+  //    These are stored in blk.mom (month-over-month change) not blk.aw ──
+  'us-lc':    null,   // MoM change used — no stated BLK sub-benchmark
+  'us-gr':    null,   // MoM change used — no stated BLK sub-benchmark
+  'us-val':   null,   // MoM change used — no stated BLK sub-benchmark
+  'hy-bonds': null,   // MoM change used — HY too small in Universal to pin precisely
+  'intl-debt': 3.0,   // International portion of Bloomberg Universal
+  'em-bonds':  0.0,   // EM bonds not material in Bloomberg Universal
+  gold:        0.0,   // not in benchmark
+  oil:         0.0,   // not in benchmark
+};
+
+/* ── Asset table definitions ── */
+const T_PRIMARY = [
+  { id:'equities', name:'Equities',     sub:'Total equity allocation' },
+  { id:'bonds',    name:'Bonds',        sub:'Total fixed income allocation' },
+  { id:'cash',     name:'Cash',         sub:'Cash & cash equivalents' },
+  { id:'alts',     name:'Alternatives', sub:'Gold, oil, liquid alternatives' },
+];
+const T_EQUITIES = [
+  { id:'us-eq',    name:'U.S. Equities',              sub:'Broad US equity (all US ETFs in BLK)' },
+  { id:'dev-intl', name:'Developing ex-US Equities',  sub:'MSCI EAFE — Europe, Japan, Pacific' },
+  { id:'em-eq',    name:'Emerging Markets Equities',  sub:'MSCI EM — China, India, Brazil, Korea…' },
+  { id:'us-lc',    name:'U.S. Large-Cap',             sub:'IVV+BLCR in BLK · NDR Mode B · BLK: MoM active weight (current vs prior month)' },
+  { id:'us-gr',    name:'U.S. Growth',                sub:'IVW+MTUM in BLK · NDR Mode B · BLK: MoM active weight (current vs prior month)' },
+  { id:'us-val',   name:'U.S. Value',                 sub:'IVE in BLK · NDR Mode B · BLK: MoM active weight (current vs prior month)' },
+];
+const T_FIXED = [
+  { id:'us-treas',  name:'U.S. Treasuries',               sub:'US govt bonds short & long combined (GOVT+TLH in BLK)' },
+  { id:'ig-credit', name:'IG Credit',                     sub:'Investment grade — MBS, corp, universal (MBB+IUSB in BLK)' },
+  { id:'hy-bonds',  name:'High Yield Bonds',              sub:'BB–B rated corporate · NDR Mode B · BLK: MoM active weight (ICVT, 0% in 60/40)' },
+  { id:'intl-debt', name:'Intl / Developing ex-US Bonds', sub:'Global govt bonds USD hedged (GGOV in BLK)' },
+  { id:'em-bonds',  name:'Emerging Markets Bonds',        sub:'EM sovereign hard currency · NDR Mode B' },
+];
+const T_ALTS = [
+  { id:'cash', name:'Cash',              sub:'Cash & equivalents (USD) · BLK 60/40 = 2%' },
+  { id:'gold', name:'Gold',              sub:'iShares Gold Trust IAU · BLK 60/40 = 1% · NDR Mode B · BCA overlay' },
+  { id:'oil',  name:'Oil / Energy',      sub:'Crude oil / energy · BLK 60/40 = 0% · NDR Mode B' },
+  { id:'alts', name:'Liquid Alternatives',sub:'Systematic alternatives IALT · BLK 60/40 = 3%' },
 ];
 
-/* Table 2: Sub-asset class */
-const SUB_ASSETS = [
-  { id: 'us-lc',     name: 'U.S. Large-Cap',              sub: 'S&P 500 / Russell 1000' },
-  { id: 'us-sc',     name: 'U.S. Small-Cap',              sub: 'Russell 2000' },
-  { id: 'us-gr',     name: 'U.S. Growth',                 sub: 'Russell 1000 Growth / QQQ' },
-  { id: 'us-val',    name: 'U.S. Value',                   sub: 'Russell 1000 Value' },
-  { id: 'em-eq',     name: 'Emerging Markets Equities',    sub: 'MSCI EM' },
-  { id: 'dev-intl',  name: "Developing (Int'l) Equities",  sub: 'MSCI EAFE — Europe, Japan, Pacific' },
-  { id: 'govt-us',   name: 'Govt Bonds (U.S.)',            sub: 'US Treasuries — all maturities' },
-  { id: 'intl-debt', name: 'International Debt',           sub: 'DM sovereign ex-US' },
-  { id: 'ig-credit', name: 'Institutional Grade (IG Credit)', sub: 'Investment grade corporate bonds' },
-  { id: 'hy-bonds',  name: 'High Yield Bonds',             sub: 'BB–B rated corporate' },
-  { id: 'em-bonds',  name: 'Emerging Markets Bonds',       sub: 'EM sovereign hard currency' },
-  { id: 'oil',       name: 'Oil',                          sub: 'Brent / WTI crude' },
-];
+/* ── State ── */
+const STORE = 'ff_dash_v4';
+let S = (() => { try { const r=localStorage.getItem(STORE); return r?JSON.parse(r):blank(); } catch(e){return blank();} })();
 
-/* ══════════════════════════════════════════════════════
-   RENDER FUNCTIONS
-   ══════════════════════════════════════════════════════ */
-function renderTable(tbodyId, assetList, data) {
-  const tbody = document.getElementById(tbodyId);
-  if (!tbody) return;
+function blank() {
+  return {
+    as_of: null,
+    sources: { ndr:{status:'pending'}, bca:{status:'pending'}, blk:{status:'pending'} },
+    /* assets[id][firm] = { pos, bm, aw, view, mode }
+       pos, bm, aw: numbers (Mode A) — null if not provided
+       view: string label (Mode B) — null if not provided
+       mode: 'A' | 'B' | null */
+    assets: {},
+    history: [],
+  };
+}
+function saveS() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch(e){} }
 
-  const assetMap = {};
-  (data.assets || []).forEach(a => { assetMap[a.id] = a; });
+/* ── BlackRock benchmark and active weight computation ────────────────
+   Two approaches depending on whether BLK publishes a sub-benchmark:
 
-  let html = '';
-  let anyRow = false;
+   MODE A (stated benchmark exists — high confidence):
+     benchmark  = BLK_STATED_BM[id]   (from 42% ACWI+18% USA+38% Universal+2% T-Bill)
+     active weight = ETF holding % − benchmark %
+     Assets: equities, bonds, cash, alts, us-eq, dev-intl, em-eq,
+             us-treas, ig-credit, intl-debt, em-bonds, gold, oil
 
-  assetList.forEach(def => {
-    const a = assetMap[def.id];
-    if (!a) return; // Asset not in data — skip silently
+   MODE A-MOM (no stated sub-benchmark — uses month-over-month change):
+     active weight = current month holding % − prior month holding %
+     prior month   = current − change column (from "CHANGES TO HOLDINGS" table)
+     This measures direction of conviction change, not level vs benchmark.
+     Assets: us-lc, us-gr, us-val, hy-bonds
+   ─────────────────────────────────────────────────────────────────── */
+function blkBM(id) {
+  return BLK_STATED_BM[id] ?? null;   // null for MoM assets
+}
 
-    // Compute scores
-    const ndrScore = a.ndrActiveWt !== undefined ? scoreFromActiveWeight(a.ndrActiveWt)
-                   : a.ndrScore !== undefined    ? a.ndrScore : null;
-    const bcaScore = a.bcaActiveWt !== undefined ? scoreFromActiveWeight(a.bcaActiveWt)
-                   : a.bcaScore !== undefined    ? a.bcaScore : null;
-    const biiScore = a.biiSignal !== undefined   ? scoreFromBII(a.biiSignal)
-                   : a.biiScore !== undefined    ? a.biiScore : null;
+/* Compute active weight for a BLK asset:
+   - If MoM asset: current − prior month
+   - Otherwise: current − stated benchmark */
+function blkActiveWt(id, pos) {
+  if (pos === null || pos === undefined) return null;
+  if (BLK_MOM_IDS.has(id)) {
+    const prior = BLK_POS_PRIOR[id];
+    if (prior === null || prior === undefined) return null;
+    return Math.round((pos - prior) * 100) / 100;
+  }
+  const bm = BLK_STATED_BM[id];
+  if (bm === null || bm === undefined) return null;
+  return Math.round((pos - bm) * 100) / 100;
+}
 
-    // Active weight display values
-    const ndrWt = a.ndrActiveWt !== undefined ? a.ndrActiveWt : null;
-    const bcaWt = a.bcaActiveWt !== undefined ? a.bcaActiveWt : null;
+/* ── Modal ── */
+let curSrc = 'ndr';
+const HINTS = {
+  ndr: 'Select your NDR House Views PDF (must include Global section with Position/Benchmark columns)',
+  bca: 'Select your BCA GIS FullView Portfolio PDF',
+  blk: 'Select your BlackRock Target Allocation ETF PDF (T&O… filename)',
+};
+const SRC_LABELS = { ndr:'NDR', bca:'BCA GIS', blk:'BlackRock 60/40 ETF' };
 
-    anyRow = true;
-    html += `<tr>
-      <td>
-        <div class="asset-name">${def.name}</div>
-        <div class="asset-sub">${def.sub}</div>
-      </td>
-      ${sigCell(ndrScore, ndrWt)}
-      ${sigCell(bcaScore, bcaWt)}
-      ${sigCell(biiScore, null)}
-      ${conCell([ndrScore, bcaScore, biiScore])}
-      ${trendCell(data.history, def.id)}
-    </tr>`;
+function openModal(src){ setSrc(src||'ndr'); document.getElementById('modal-bg').classList.remove('hidden'); showUpload(); }
+function closeModal(){ document.getElementById('modal-bg').classList.add('hidden'); showUpload(); }
+function bgClick(e){ if(e.target===document.getElementById('modal-bg')) closeModal(); }
+function setSrc(s){
+  curSrc=s;
+  ['ndr','bca','blk'].forEach(k=>document.getElementById('tab-'+k).classList.toggle('active',k===s));
+  document.getElementById('dz-hint').textContent=HINTS[s];
+}
+function showUpload(){ document.getElementById('upload-section').style.display=''; document.getElementById('parsing-section').style.display='none'; }
+function showParsing(lbl,detail){ document.getElementById('upload-section').style.display='none'; document.getElementById('parsing-section').style.display=''; document.getElementById('parse-lbl').textContent=lbl||'Reading PDF…'; document.getElementById('parse-detail').textContent=detail||''; }
+
+function dzOver(e){ e.preventDefault(); document.getElementById('dz').classList.add('over'); }
+function dzLeave(){ document.getElementById('dz').classList.remove('over'); }
+function dzDrop(e){ e.preventDefault(); dzLeave(); if(e.dataTransfer.files[0]) go(e.dataTransfer.files[0]); }
+function fileChosen(e){ if(e.target.files[0]) go(e.target.files[0]); }
+
+/* ── PDF processing ── */
+async function go(file) {
+  if(!file.name.endsWith('.pdf')&&file.type!=='application/pdf'){ toast('Please upload a PDF','err'); return; }
+  const src=curSrc;
+  showParsing(`Reading ${SRC_LABELS[src]} PDF…`,'Sending to Claude for extraction…');
+  let b64; try{ b64=await toB64(file); }catch(e){ errState('Could not read file'); return; }
+
+  try {
+    showParsing('Claude is reading the PDF…','Extracting signals using the correct format for this source');
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6', max_tokens:1000,
+        messages:[{ role:'user', content:[
+          { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 }},
+          { type:'text', text:buildPrompt(src) }
+        ]}]
+      })
+    });
+    if(!resp.ok){ const e=await resp.json().catch(()=>{}); throw new Error(e?.error?.message||`API ${resp.status}`); }
+    const data=await resp.json();
+    const text=(data.content||[]).map(b=>b.text||'').join('');
+    showParsing('Applying scoring formula…','Computing active weights and signals');
+    let parsed; try{ const m=text.match(/\{[\s\S]*\}/); if(!m) throw 0; parsed=JSON.parse(m[0]); }
+    catch(e){ throw new Error("Claude's response could not be parsed. Try re-uploading the PDF."); }
+    merge(src,parsed,file.name);
+    updateHistory(); saveS(); renderAll(); closeModal();
+    const n=Object.values(parsed.assets||{}).filter(a=>a.pos!=null||a.bm!=null||a.view!=null).length;
+    toast(`${SRC_LABELS[src]} loaded — ${n} signals extracted`,'ok');
+  } catch(err){ console.error(err); errState(err.message); }
+}
+
+function errState(msg){ showParsing('Error',msg); setTimeout(()=>{ showUpload(); toast(msg,'err'); },2500); }
+
+/* ── Extraction prompts — source-specific ── */
+function buildPrompt(src) {
+  /*
+    Schema: each asset entry has:
+      pos:  position weight (number, percent) — null if not provided
+      bm:   benchmark weight (number, percent) — null if not provided
+      view: directional label string — null if not provided
+    At least one of pos/bm/view must be non-null to be useful.
+    pos and bm enable Mode A (active weight scoring).
+    view alone enables Mode B (directional scoring).
+    Do NOT compute active weight or score — just extract raw data.
+  */
+  const schema = `Return ONLY valid JSON, no other text:
+{
+  "source": "${src}",
+  "report_date": "date string from document",
+  "assets": {
+    "equities":  { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "bonds":     { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "cash":      { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "alts":      { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "us-eq":     { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "dev-intl":  { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "em-eq":     { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "us-lc":     { "pos": number_or_null, "bm": number_or_null, "view": string_or_null, "prior": number_or_null },
+    "us-gr":     { "pos": number_or_null, "bm": number_or_null, "view": string_or_null, "prior": number_or_null },
+    "us-val":    { "pos": number_or_null, "bm": number_or_null, "view": string_or_null, "prior": number_or_null },
+    "us-treas":  { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "ig-credit": { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "hy-bonds":  { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "intl-debt": { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "em-bonds":  { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "gold":      { "pos": number_or_null, "bm": number_or_null, "view": string_or_null },
+    "oil":       { "pos": number_or_null, "bm": number_or_null, "view": string_or_null }
+  }
+}`;
+
+  const instructions = {
+    ndr: `This is an NDR (Ned Davis Research) House Views PDF.
+NDR uses a table with three columns: View | Position | Benchmark.
+Some rows have all three (View, Position %, Benchmark %) — extract all three.
+Some rows have only View (OVER/MARKET/UNDER/NEUTRAL/BULLISH/BEARISH) with no numbers — extract view only.
+
+ASSET MAPPING (map NDR labels to these IDs):
+"equities"  ← Stocks (Global Asset Allocation section), pos=60%, bm=55%, view=OVER
+"bonds"     ← Bonds (Global Asset Allocation section), pos=30%, bm=35%, view=UNDER
+"cash"      ← Cash (Global Asset Allocation section), pos=10%, bm=10%, view=MARKET
+"us-eq"     ← U.S. (Regional Equity Allocation section), pos=63%, bm=64.0%, view=MARKET
+"dev-intl"  ← Europe ex. U.K. + Japan + Pacific ex. Japan (combine into developing intl)
+              Use Europe ex UK as primary: pos=8%, bm=11.2%, view=UNDER
+"em-eq"     ← Emerging Markets (Regional Equity), pos=16%, bm=11.2%, view=OVER
+"us-lc"     ← Large-Cap (U.S. Equities - Cap section), view=OVER only (no pos/bm)
+"us-gr"     ← Growth (U.S. Equities - Style section), view=NEUTRAL only
+"us-val"    ← Value (U.S. Equities - Style section), view=NEUTRAL only
+"us-treas"  ← U.S. (Regional Bond Allocation), pos=60%, bm=56%, view=OVER
+"ig-credit" ← Investment Grade Credit (U.S. Fixed Income Sectors), view=MARKET only
+"hy-bonds"  ← High Yield / Junk (Fixed Income Sectors), view=MARKET only
+"intl-debt" ← Europe bonds (Regional Bond), pos=28%, bm=29%, view=MARKET
+"em-bonds"  ← Emerging Markets (EM) Debt (Fixed Income Sectors), view=OVER only
+"gold"      ← Gold (Commodities section), view=NEUTRAL only (no pos/bm)
+"oil"       ← Oil (Commodities section), view=NEUTRAL only
+"alts"      ← set all null (NDR does not publish an alternatives allocation)
+
+CRITICAL: Extract EXACTLY what the document states. Do not infer or estimate missing values.
+Numbers are plain percentages without symbols (e.g. 60 not "60%").
+For view-only rows, pos=null and bm=null.`,
+
+    bca: `This is a BCA Research Global Investment Strategy (GIS) FullView Portfolio PDF.
+The main table has three columns: GIS FullView Portfolio (%) | Benchmark (%) | Difference (%pts).
+Additionally there are Macro Overlay Trades with directional signals.
+
+ASSET MAPPING:
+"equities"  ← Equity row in Asset Allocation table: pos=57.8, bm=60.0
+"bonds"     ← Bond row: pos=28.8, bm=25.0
+"cash"      ← Cash row: pos=13.4, bm=15.0
+"alts"      ← set all null (no alternatives allocation row in main table)
+"us-eq"     ← US row in Global Equity Regions: pos=37.8, bm=40.1
+"dev-intl"  ← Euro Area + Japan + UK + Pacific combined. Use Euro Area as primary (most significant deviation):
+              pos=4.4, bm=4.7. view=null (no directional label in main table)
+"em-eq"     ← EM (EEM) row: pos=7.8, bm=7.4
+"us-lc"     ← set all null (BCA does not break out large-cap separately)
+"us-gr"     ← set all null
+"us-val"    ← set all null
+"us-treas"  ← set all null (BCA bonds are combined, no US Treasury breakdown)
+"ig-credit" ← set all null
+"hy-bonds"  ← set all null
+"intl-debt" ← set all null
+"em-bonds"  ← Look at macro overlays: if "Long EEM/Short ACWI" is active and positive, view="OVER". Otherwise null.
+"gold"      ← Look at macro overlays: "Long GLD/Short BIL" active = view="OVER". pos=null, bm=null.
+"oil"       ← set all null (no oil overlay present)
+
+CRITICAL: For macro overlay signals, only set view if the trade is currently active (not closed).
+A positive return and active status = the directional view is active.
+Numbers are plain percentages. Do not guess values not in the document.`,
+
+    blk: `This is a BlackRock Target Allocation ETF PDF.
+Extract data ONLY from the 60/40 column in the "LATEST HOLDINGS (%)" table.
+
+For bm: return null for all assets.
+
+IMPORTANT: Also extract the "prior" field for these specific assets by reading BOTH tables:
+1. "LATEST HOLDINGS (%)" table → the current pos (60/40 column)
+2. "CHANGES TO HOLDINGS (%)" table → the change amount (60/40 column)
+   Prior month = current − change (compute this yourself)
+   These assets need a prior value: us-lc, us-gr, us-val, hy-bonds
+
+For pos, use the 60/40 column from LATEST HOLDINGS and map ETF tickers as follows:
+"equities"  ← US Equities row total + International/Global Equities total + Sector Equities total = 61.0
+"bonds"     ← US Fixed Income total + International/Global Fixed Income total = 33.0
+"cash"      ← Cash & Cash Alternatives row = 2.0
+"alts"      ← Alternatives row total = 4.0
+"us-eq"     ← US Equities row total = 44.0
+"dev-intl"  ← CORO + EFG + EFV = 2.0 + 3.5 + 2.0 = 7.5
+"em-eq"     ← IEMG = 4.0
+"us-lc"     ← LATEST: IVV + BLCR = 16.0 + 3.0 = 19.0
+              prior = 19.0 − (IVV_change + BLCR_change) = 19.0 − (6.5+0.5) = 12.0
+"us-gr"     ← LATEST: IVW + MTUM = 7.0 + 3.0 = 10.0
+              prior = 10.0 − (0.0 + (−0.5)) = 10.5
+"us-val"    ← LATEST: IVE = 6.5
+              prior = 6.5 − (−1.0) = 7.5
+"us-treas"  ← GOVT + TLH = 4.0 + 3.0 = 7.0
+"ig-credit" ← MBB + IUSB = 5.0 + 18.0 = 23.0
+"hy-bonds"  ← LATEST: ICVT = 0.0
+              prior = 0.0 − 0.0 = 0.0
+"intl-debt" ← GGOV = 3.0
+"em-bonds"  ← 0.0 (not held in 60/40)
+"gold"      ← IAU = 1.0
+"oil"       ← 0.0
+
+If the PDF shows different values in the 60/40 column, use the PDF values (it is the source of truth).
+For view: return null for all assets (BLK uses position weights, not labels).`
+  };
+
+  return `${instructions[src]}\n\nRULES:\n1. Only extract values explicitly in the document. null = not present.\n2. Numbers are plain floats, no % symbol.\n3. view is a short string: "OVER", "UNDER", "MARKET", "NEUTRAL", "BULLISH", "BEARISH" — or null.\n4. Return only the JSON. No explanation.\n\n${schema}`;
+}
+
+/* ── Merge extracted data into state ── */
+function merge(src, parsed, filename) {
+  const now = new Date();
+  S.sources[src] = { status:'ready', filename, retrieved: parsed.report_date||now.toLocaleDateString('en-US',{month:'long',year:'numeric'}), loaded_at:now.toISOString() };
+  S.as_of = now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+  Object.entries(parsed.assets||{}).forEach(([id,d]) => {
+    if(!S.assets[id]) S.assets[id]={};
+    if(src==='blk'){
+      /* BLK: store position and prior-month from PDF.
+         For stated-benchmark assets: active weight = pos − stated_bm
+         For MoM assets: active weight = pos − prior_month_pos
+         Both computed via blkActiveWt() at render time. */
+      const pos   = d.pos   ?? BLK_POS[id]       ?? null;
+      const prior = d.prior ?? BLK_POS_PRIOR[id]  ?? null;
+      const isMoM = BLK_MOM_IDS.has(id);
+      const bm    = isMoM ? null : (BLK_STATED_BM[id] ?? null);
+      const aw    = blkActiveWt(id, pos);
+      const modeLabel = isMoM ? 'A-MoM' : 'A';
+      S.assets[id].blk = { pos, prior, bm, aw, view:null, mode:modeLabel };
+    } else {
+      const pos = d.pos ?? null;
+      const bm  = d.bm  ?? null;
+      const aw  = (pos!==null&&bm!==null) ? Math.round((pos-bm)*100)/100 : null;
+      const view = d.view ?? null;
+      const mode = aw!==null ? 'A' : view!==null ? 'B' : null;
+      S.assets[id][src] = { pos, bm, aw, view, mode };
+    }
   });
 
-  if (!anyRow) {
-    html = `<tr><td colspan="6" class="no-data" style="text-align:center;padding:2rem">
-      No data loaded yet. Run the GitHub Action to populate signals.
-    </td></tr>`;
-  }
-
-  tbody.innerHTML = html;
+  /* Recompute BLK active weights:
+     - Stated-benchmark assets: pos − BLK_STATED_BM
+     - MoM assets: pos − prior month pos
+     blkActiveWt() handles both cases. */
+  Object.keys(S.assets).forEach(id => {
+    const d = S.assets[id].blk;
+    if (d) {
+      const isMoM = BLK_MOM_IDS.has(id);
+      S.assets[id].blk.bm = isMoM ? null : (BLK_STATED_BM[id] ?? null);
+      S.assets[id].blk.aw = blkActiveWt(id, d.pos);
+    }
+  });
 }
 
-/* ── Source status bar ── */
-function renderStatus(data) {
-  const bar = document.getElementById('status-bar');
-  const sources = data.sources || {};
-  const chips = [
-    { key: 'ndr',  label: 'NDR House Views',           color: '#5B8EC4' },
-    { key: 'bca',  label: 'BCA GIS FullView Portfolio', color: '#C9A96E' },
-    { key: 'bii',  label: 'BlackRock BII',              color: '#7FBFCF' },
-  ];
-
-  bar.innerHTML = chips.map(c => {
-    const src = sources[c.key] || {};
-    const status = src.status || 'pending';
-    const dotCls = status === 'live' ? 'dot-live'
-                 : status === 'manual' ? 'dot-manual'
-                 : status === 'failed' ? 'dot-failed' : 'dot-pending';
-    const statusTxt = status === 'live'    ? '● Live'
-                    : status === 'manual'  ? '✎ Manual entry'
-                    : status === 'failed'  ? '✗ Failed'
-                    : '◎ Pending';
-    const dateStr = src.retrieved
-      ? `<span class="date">${src.retrieved}</span>`
-      : '<span style="color:var(--dim)">not yet retrieved</span>';
-
-    return `<div class="src-chip">
-      <div class="dot ${dotCls}"></div>
-      <div>
-        <span class="firm" style="color:${c.color}">${c.label}</span>
-        ${statusTxt} · ${dateStr}
-        <br><span style="color:var(--dim);font-size:.58rem">${src.page || ''}</span>
-      </div>
-    </div>`;
-  }).join('');
+/* ── History snapshot ── */
+function updateHistory() {
+  const month = new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
+  const snap = { month, assets:{} };
+  [...T_PRIMARY,...T_EQUITIES,...T_FIXED,...T_ALTS].forEach(def => {
+    const d=S.assets[def.id]||{};
+    snap.assets[def.id]={ ndrScore:computeScore(d.ndr), bcaScore:computeScore(d.bca), blkScore:computeScore(d.blk&&{aw:d.blk.aw}) };
+  });
+  S.history=S.history.filter(h=>h.month!==month);
+  S.history.push(snap);
+  S.history=S.history.slice(-12);
 }
 
-/* ── History cards ── */
-function renderHistory(data) {
-  const grid = document.getElementById('history-grid');
-  if (!grid) return;
-  if (!data.history || data.history.length === 0) return;
+/* ══════════════════════════════════
+   RENDERING
+ ══════════════════════════════════ */
+function renderAll(){renderTopbar();renderSrcBar();renderTable('tbody-primary',T_PRIMARY);renderTable('tbody-equities',T_EQUITIES);renderTable('tbody-fixed',T_FIXED);renderTable('tbody-alts',T_ALTS);renderHistory();}
 
-  const allAssets = [...PRIMARY_ASSETS, ...SUB_ASSETS];
-  const recentHistory = data.history.slice(-12); // last 12 months
+function renderTopbar(){ const el=document.getElementById('as-of-label'); el.innerHTML=S.as_of?`Data as of <strong>${S.as_of}</strong>`:'No data loaded'; }
 
-  grid.innerHTML = allAssets.map(def => {
-    const rows = recentHistory.map(snap => {
-      const a = (snap.assets || []).find(x => x.id === def.id);
-      if (!a) return null;
-      const scores = [a.ndrScore, a.bcaScore, a.biiScore].filter(s => s !== null);
-      const avg = scores.length ? scores.reduce((x, y) => x + y, 0) / scores.length : null;
-      const { label, cls } = avg !== null ? consensusLabel(avg) : { label: '—', cls: 'b-na' };
-      return { month: snap.month, label, cls };
-    }).filter(Boolean);
-
-    if (rows.length === 0) return '';
-
-    const tableRows = rows.map(r =>
-      `<tr>
-        <td class="month-label">${r.month}</td>
-        <td><span class="legend-badge ${r.cls}" style="font-size:.58rem;min-width:80px">${r.label}</span></td>
-      </tr>`
-    ).join('');
-
-    return `<div class="history-card">
-      <div class="history-card-name">${def.name}</div>
-      <table class="history-table">
-        <thead><tr><th>Month</th><th>Consensus</th></tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-    </div>`;
-  }).filter(Boolean).join('');
-
-  if (!grid.innerHTML.trim()) {
-    grid.innerHTML = '<div class="history-card" style="color:var(--dim);font-size:.72rem;font-style:italic">No history yet.</div>';
-  }
+function renderSrcBar(){
+  ['ndr','bca','blk'].forEach(s=>{
+    const src=S.sources[s]; const badge=document.getElementById('badge-'+s); const meta=document.getElementById('meta-'+s);
+    if(src.status==='ready'){badge.textContent='✓ Ready';badge.className='src-badge b-ready';meta.innerHTML=`<strong style="color:var(--silver)">${src.filename}</strong><br><span>${src.retrieved}</span>`;}
+    else{badge.textContent='No PDF';badge.className='src-badge b-pending';meta.innerHTML='<span>Click to upload</span>';}
+  });
 }
 
-/* ══════════════════════════════════════════════════════
-   BOOT — load allocations.json and render everything
-   ══════════════════════════════════════════════════════ */
-async function boot() {
-  let data;
-  try {
-    const res = await fetch(`data/allocations.json?t=${Date.now()}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    data = await res.json();
-  } catch (err) {
-    document.getElementById('as-of-label').textContent = '⚠ Could not load data/allocations.json — run GitHub Action first';
-    document.getElementById('primary-tbody').innerHTML =
-      '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--dim)">Run the GitHub Action to generate data.</td></tr>';
-    document.getElementById('sub-tbody').innerHTML =
-      '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--dim)">Run the GitHub Action to generate data.</td></tr>';
+function renderTable(tbodyId, defs) {
+  const tbody = document.getElementById(tbodyId);
+  const hasData = Object.keys(S.assets).length>0;
+  if(!hasData){
+    tbody.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><div class="empty-lbl">No data yet</div><div class="empty-hint">Upload NDR, BCA, and BlackRock PDFs using the button above.</div></div></td></tr>`;
     return;
   }
-
-  // Date header
-  const label = document.getElementById('as-of-label');
-  const d = new Date(data.as_of);
-  const formatted = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', day: 'numeric' });
-  label.innerHTML = `Data as of <strong>${formatted}</strong>`;
-
-  renderStatus(data);
-  renderTable('primary-tbody', PRIMARY_ASSETS, data);
-  renderTable('sub-tbody', SUB_ASSETS, data);
-  renderHistory(data);
+  let html='';
+  defs.forEach(def=>{
+    const d=S.assets[def.id]||{};
+    /* Compute BLK data with fresh benchmark */
+    const blkData = d.blk ? { ...d.blk, bm:blkBM(def.id), aw: d.blk.pos!==null ? Math.round((d.blk.pos-blkBM(def.id))*100)/100 : null } : null;
+    const ndrScore=computeScore(d.ndr);
+    const bcaScore=computeScore(d.bca);
+    const blkScore=computeScore(blkData);
+    if(!d.ndr&&!d.bca&&!d.blk) return; /* skip if nothing loaded */
+    html+=`<tr>
+      <td><div class="asset-name">${def.name}</div><div class="asset-sub">${def.sub}</div></td>
+      ${sigCell(d.ndr,ndrScore,'NDR')}
+      ${sigCell(d.bca,bcaScore,'BCA')}
+      ${sigCell(blkData,blkScore,'BLK')}
+      ${conCell([ndrScore,bcaScore,blkScore])}
+      ${trendCell(def.id)}
+    </tr>`;
+  });
+  tbody.innerHTML=html||`<tr><td colspan="6" style="text-align:center;padding:1.1rem;color:var(--dim);font-style:italic">No data found for this table in uploaded PDFs.</td></tr>`;
 }
 
-document.addEventListener('DOMContentLoaded', boot);
+function sigCell(data, score, firm) {
+  if(!data){ return '<td class="c"><span class="sig sig-NC">Not Covered</span></td>'; }
+
+  const mode = data.mode || (data.aw!==null&&data.aw!==undefined?'A':data.view?'B':null);
+  const pos  = data.pos!==null&&data.pos!==undefined ? data.pos.toFixed(1)+'%' : '—';
+  const bm   = data.bm!==null&&data.bm!==undefined  ? data.bm.toFixed(1)+'%' : '—';
+  const aw   = data.aw!==null&&data.aw!==undefined   ? data.aw : null;
+  const awStr= aw!==null ? (aw>=0?'+':'')+aw.toFixed(1)+'pp' : '—';
+  const awCls= aw!==null ? (aw>0?'tip-active-pos':aw<0?'tip-active-neg':'') : '';
+  const viewStr = data.view || '—';
+  const modeNote = mode==='A' ? 'Mode A: active weight scoring' : mode==='B' ? 'Mode B: directional label scoring' : '';
+  const isMoMAsset = firm==='BLK' && data.mode==='A-MoM';
+  const blkNote = firm==='BLK'
+    ? isMoMAsset
+      ? `<div class="tip-mode">MoM: current ${data.pos!==null?data.pos.toFixed(1)+'%':'—'} vs prior ${data.prior!==null?data.prior.toFixed(1)+'%':'—'} — no stated sub-benchmark</div>`
+      : '<div class="tip-mode">vs BLK stated benchmark (42% ACWI+18% USA+38% Univ+2% T-Bill)</div>'
+    : '';
+
+  const popup=`<div class="tip-popup">
+    <strong>${firm} — ${def_name_for(data)}</strong>
+    <div class="tip-row"><span class="tip-key">Position</span><span class="tip-val">${pos}</span></div>
+    <div class="tip-row"><span class="tip-key">Benchmark</span><span class="tip-val">${bm}</span></div>
+    <div class="tip-row"><span class="tip-key">Active weight</span><span class="tip-val ${awCls}">${awStr}</span></div>
+    <div class="tip-row"><span class="tip-key">View label</span><span class="tip-val">${viewStr}</span></div>
+    ${blkNote}<div class="tip-mode">${modeNote}</div>
+  </div>`;
+
+  if(score===null){ return `<td class="c"><div class="cell-tip"><span class="sig sig-NC">Not Covered</span>${popup}</div></td>`; }
+
+  const {l,c} = scoreLabel(score)||{l:'—',c:'sig-NC'};
+  const subLine = aw!==null
+    ? `<span class="tip-sub ${aw>0.2?'pos':aw<-0.2?'neg':''}">${aw>=0?'+':''}${aw.toFixed(1)}pp</span>`
+    : (data.view ? `<span class="tip-sub">${data.view}</span>` : '');
+
+  return `<td class="c"><div class="cell-tip"><span class="sig ${c}">${l}</span>${subLine}${popup}</div></td>`;
+}
+
+function def_name_for(data){ return ''; } /* placeholder — popup uses firm label */
+
+function conCell(scores){
+  const valid=scores.filter(s=>s!==null);
+  if(!valid.length) return '<td class="c"><span class="sig sig-NC">—</span></td>';
+  const avg=valid.reduce((a,b)=>a+b,0)/valid.length;
+  const {l,c}=consensusLabel(avg);
+  const bars=scores.map((s,i)=>{
+    if(s===null) return `<div class="con-bar" style="height:4px;background:var(--navy5)"></div>`;
+    const h=4+Math.abs(s)*4; const bg=s>0?'var(--ow)':s<0?'var(--uw)':'var(--mw)';
+    return `<div class="con-bar" style="height:${h}px;background:${bg}" title="${['NDR','BCA','BLK'][i]}: ${s>0?'+':''}${s}"></div>`;
+  }).join('');
+  return `<td class="c"><div class="con-wrap"><div class="con-bars">${bars}</div><span class="sig ${c}" style="font-size:.6rem;min-width:86px">${l}</span></div></td>`;
+}
+
+function trendCell(id){
+  if(S.history.length<2) return '<td class="c"><span class="trend-arrow t-flat">—</span></td>';
+  const pts=S.history.slice(-3).map(snap=>{
+    const a=snap.assets?.[id]; if(!a) return null;
+    const sc=[a.ndrScore,a.bcaScore,a.blkScore].filter(s=>s!==null);
+    return sc.length ? sc.reduce((x,y)=>x+y,0)/sc.length : null;
+  }).filter(s=>s!==null);
+  if(pts.length<2) return '<td class="c"><span class="trend-arrow t-flat">—</span></td>';
+  const dots=pts.map(p=>`<div class="trend-dot" style="background:${p>0.5?'var(--ow)':p<-0.5?'var(--uw)':'var(--mw)'}"></div>`).join('');
+  const d=pts[pts.length-1]-pts[0]; const arrow=d>0.25?'▲':d<-0.25?'▼':'—'; const cls=d>0.25?'t-up':d<-0.25?'t-dn':'t-flat';
+  return `<td class="c"><div class="trend-dots">${dots}</div><div class="trend-arrow ${cls}">${arrow}</div></td>`;
+}
+
+function renderHistory(){
+  const grid=document.getElementById('hist-grid');
+  if(!S.history.length){grid.innerHTML='<div style="color:var(--dim);font-size:.68rem;font-style:italic;padding:.4rem">History builds automatically each month after upload.</div>';return;}
+  const allDefs=[...T_PRIMARY,...T_EQUITIES,...T_FIXED,...T_ALTS];
+  const recent=S.history.slice(-12);
+  const cards=allDefs.map(def=>{
+    const rows=recent.map(snap=>{
+      const a=snap.assets?.[def.id]; if(!a) return null;
+      const sc=[a.ndrScore,a.bcaScore,a.blkScore].filter(s=>s!==null);
+      if(!sc.length) return null;
+      const avg=sc.reduce((x,y)=>x+y,0)/sc.length;
+      return {month:snap.month,...consensusLabel(avg)};
+    }).filter(Boolean);
+    if(!rows.length) return '';
+    return `<div class="hist-card"><div class="hist-card-name">${def.name}</div><table class="hist-tbl"><thead><tr><th>Month</th><th>Consensus</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="hist-month">${r.month}</td><td><span class="sig ${r.c}" style="font-size:.57rem;min-width:76px">${r.l}</span></td></tr>`).join('')}</tbody></table></div>`;
+  }).filter(Boolean).join('');
+  grid.innerHTML=cards||'<div style="color:var(--dim);font-size:.68rem;font-style:italic">No history yet.</div>';
+}
+
+function toB64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=()=>rej(new Error('File read failed')); r.readAsDataURL(file); }); }
+function toast(msg,type){ const el=document.getElementById('toast'); el.textContent=msg; el.className=`toast ${type||''} show`; setTimeout(()=>el.classList.remove('show'),4500); }
+
+document.addEventListener('DOMContentLoaded',()=>{ setSrc('ndr'); renderAll(); });
 </script>
 </body>
 </html>
