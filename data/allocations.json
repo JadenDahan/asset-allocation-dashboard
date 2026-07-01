@@ -1,233 +1,116 @@
 {
-  "as_of": "2026-06-24",
+  "as_of": "2026-07-01",
   "sources": {
     "ndr": {
-      "status": "demo",
-      "retrieved": "2026-06-24",
-      "message": "Demo mode \u2014 representative data",
+      "status": "failed",
+      "message": "NDR: logged in and navigated (page: 'Home | NDR | Investment Research') but could not parse position/benchmark table. The page layout may have changed. Please check ndr.com/group/ndr and update NDR_MAP or _parse_html().",
+      "retrieved": "none",
       "page": "NDR House Views \u2014 ndr.com/group/ndr"
     },
     "bca": {
-      "status": "demo",
-      "retrieved": "2026-06-24",
-      "message": "Demo mode \u2014 representative data",
-      "page": "BCA GIS FullView Portfolio \u2014 bcaresearch.com"
+      "status": "failed",
+      "message": "BCA: logged in (page: 'Global Investment Strategy | BCA Research') but could not parse FullView table. Page layout may have changed. Update BCA_MAP or _parse_html().",
+      "retrieved": "none",
+      "page": "BCA GIS FullView Portfolio \u2014 bcaresearch.com/site/gis/home"
     },
     "bii": {
-      "status": "demo",
-      "retrieved": "2026-06-24",
-      "message": "Demo mode \u2014 representative data",
+      "status": "live",
+      "message": "Retrieved from public BII page. Source: https://www.blackrock.com/corporate/insights/blackrock-investment-institute/publications/outlook",
+      "retrieved": "https://www.blackrock.com/corporate/insights/blackrock-investment-institute/publications/outlook",
       "page": "BlackRock BII \u2014 blackrock.com/corporate/insights/blackrock-investment-institute/publications/outlook"
     }
   },
   "assets": [
     {
-      "id": "equities",
-      "ndrActiveWt": 5.0,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": 1,
-      "bcaActiveWt": -5.1,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": -2,
-      "biiSignal": "Overweight",
-      "biiScore": 1
-    },
-    {
       "id": "bonds",
-      "ndrActiveWt": -9.0,
+      "ndrActiveWt": null,
       "ndrPosition": null,
       "ndrBenchmark": null,
-      "ndrScore": -2,
-      "bcaActiveWt": -2.0,
+      "ndrScore": null,
+      "bcaActiveWt": null,
       "bcaPosition": null,
       "bcaBenchmark": null,
-      "bcaScore": 0,
-      "biiSignal": "Underweight",
-      "biiScore": -1
-    },
-    {
-      "id": "cash",
-      "ndrActiveWt": 12.0,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": 2,
-      "bcaActiveWt": 5.0,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": 1,
-      "biiSignal": null,
-      "biiScore": null
-    },
-    {
-      "id": "gold",
-      "ndrActiveWt": 3.0,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": 1,
-      "bcaActiveWt": 4.5,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": 1,
-      "biiSignal": "Overweight",
-      "biiScore": 1
+      "bcaScore": null,
+      "biiSignal": "Neutral",
+      "biiScore": 0
     },
     {
       "id": "us-lc",
-      "ndrActiveWt": 3.0,
+      "ndrActiveWt": null,
       "ndrPosition": null,
       "ndrBenchmark": null,
-      "ndrScore": 1,
-      "bcaActiveWt": 2.5,
+      "ndrScore": null,
+      "bcaActiveWt": null,
       "bcaPosition": null,
       "bcaBenchmark": null,
-      "bcaScore": 1,
+      "bcaScore": null,
       "biiSignal": "Overweight",
       "biiScore": 1
-    },
-    {
-      "id": "us-sc",
-      "ndrActiveWt": 0.0,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": 0,
-      "bcaActiveWt": -6.0,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": -2,
-      "biiSignal": null,
-      "biiScore": null
-    },
-    {
-      "id": "us-gr",
-      "ndrActiveWt": 3.0,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": 1,
-      "bcaActiveWt": 2.0,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": 0,
-      "biiSignal": "Overweight",
-      "biiScore": 1
-    },
-    {
-      "id": "us-val",
-      "ndrActiveWt": 0.0,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": 0,
-      "bcaActiveWt": 0.0,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": 0,
-      "biiSignal": null,
-      "biiScore": null
     },
     {
       "id": "em-eq",
-      "ndrActiveWt": 0.0,
+      "ndrActiveWt": null,
       "ndrPosition": null,
       "ndrBenchmark": null,
-      "ndrScore": 0,
-      "bcaActiveWt": 0.0,
+      "ndrScore": null,
+      "bcaActiveWt": null,
       "bcaPosition": null,
       "bcaBenchmark": null,
-      "bcaScore": 0,
-      "biiSignal": "Overweight",
-      "biiScore": 1
+      "bcaScore": null,
+      "biiSignal": "Neutral",
+      "biiScore": 0
     },
     {
       "id": "dev-intl",
-      "ndrActiveWt": 0.0,
+      "ndrActiveWt": null,
       "ndrPosition": null,
       "ndrBenchmark": null,
-      "ndrScore": 0,
-      "bcaActiveWt": -3.0,
+      "ndrScore": null,
+      "bcaActiveWt": null,
       "bcaPosition": null,
       "bcaBenchmark": null,
-      "bcaScore": -1,
+      "bcaScore": null,
       "biiSignal": "Neutral",
       "biiScore": 0
-    },
-    {
-      "id": "govt-us",
-      "ndrActiveWt": 0.0,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": 0,
-      "bcaActiveWt": 0.0,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": 0,
-      "biiSignal": "Underweight",
-      "biiScore": -1
-    },
-    {
-      "id": "intl-debt",
-      "ndrActiveWt": 0.0,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": 0,
-      "bcaActiveWt": 0.0,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": 0,
-      "biiSignal": "Underweight",
-      "biiScore": -1
     },
     {
       "id": "ig-credit",
-      "ndrActiveWt": 0.0,
+      "ndrActiveWt": null,
       "ndrPosition": null,
       "ndrBenchmark": null,
-      "ndrScore": 0,
-      "bcaActiveWt": 0.0,
+      "ndrScore": null,
+      "bcaActiveWt": null,
       "bcaPosition": null,
       "bcaBenchmark": null,
-      "bcaScore": 0,
-      "biiSignal": "Neutral",
-      "biiScore": 0
+      "bcaScore": null,
+      "biiSignal": "Underweight",
+      "biiScore": -1
     },
     {
       "id": "hy-bonds",
-      "ndrActiveWt": -2.5,
+      "ndrActiveWt": null,
       "ndrPosition": null,
       "ndrBenchmark": null,
-      "ndrScore": -1,
-      "bcaActiveWt": -7.0,
+      "ndrScore": null,
+      "bcaActiveWt": null,
       "bcaPosition": null,
       "bcaBenchmark": null,
-      "bcaScore": -2,
+      "bcaScore": null,
       "biiSignal": "Neutral",
       "biiScore": 0
     },
     {
       "id": "em-bonds",
-      "ndrActiveWt": 0.0,
+      "ndrActiveWt": null,
       "ndrPosition": null,
       "ndrBenchmark": null,
-      "ndrScore": 0,
-      "bcaActiveWt": 2.0,
+      "ndrScore": null,
+      "bcaActiveWt": null,
       "bcaPosition": null,
       "bcaBenchmark": null,
-      "bcaScore": 0,
-      "biiSignal": "Overweight",
-      "biiScore": 1
-    },
-    {
-      "id": "oil",
-      "ndrActiveWt": 2.5,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": 1,
-      "bcaActiveWt": 2.5,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": 1,
-      "biiSignal": null,
-      "biiScore": null
+      "bcaScore": null,
+      "biiSignal": "Neutral",
+      "biiScore": 0
     }
   ],
   "history": [
@@ -531,6 +414,53 @@
           "ndrScore": 1,
           "bcaScore": 1,
           "biiScore": null
+        }
+      ]
+    },
+    {
+      "month": "Jul 2026",
+      "assets": [
+        {
+          "id": "bonds",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 0
+        },
+        {
+          "id": "us-lc",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 1
+        },
+        {
+          "id": "em-eq",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 0
+        },
+        {
+          "id": "dev-intl",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 0
+        },
+        {
+          "id": "ig-credit",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": -1
+        },
+        {
+          "id": "hy-bonds",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 0
+        },
+        {
+          "id": "em-bonds",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 0
         }
       ]
     }
