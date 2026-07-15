@@ -18,13 +18,16 @@
   Mode B (only a directional label is given, e.g. NDR "OVER"/"NEUTRAL"/"UNDER"):
     OVER/BULLISH -> Overweight (+1), MARKET/NEUTRAL -> Market Weight (0), UNDER/BEARISH -> Underweight (-1)
 
-  BLACKROCK BENCHMARK (no benchmark is ever stated by BlackRock for the 60/40 ETF):
-    - If fewer than 6 months of BlackRock holdings history have been collected:
-        benchmark[asset] = average(NDR benchmark[asset], BCA benchmark[asset])
-        (uses whichever of the two is available if only one has a benchmark for that asset)
-    - Once 6+ months of BlackRock holdings history exist:
-        benchmark[asset] = trailing 12-month average of BlackRock's OWN holdings in that asset
-    Active weight = current month BlackRock position - benchmark (computed as above).
+  BLACKROCK (Aladdin "Portfolio Summary" — GA Selects 60/40):
+    - The BlackRock source is now parsed identically to the Foundation Aggressive ETF:
+      every figure in the report is already a DEVIATION vs. BlackRock's own stated
+      benchmark ("Benchmark GA Selects 60/40"), so we store the active weight (aw)
+      directly. There is NO computed benchmark and NO holdings-history requirement.
+    - Equities: summed from the "Equity Region vs Benchmark" and "Equity Style vs
+      Benchmark" pages. Fixed income: summed from the "Fixed Income Sector vs
+      Benchmark", "Fixed Income Credit Quality vs Benchmark", and "Fixed Income
+      Region vs Benchmark" pages.
+    Active weight = the deviation (pp) reported/summed directly from the document.
 
   Consensus = average of the numeric scores of firms that actually cover the asset.
   "Not Covered" is excluded from consensus, never treated as 0 (Market Weight).
@@ -154,9 +157,9 @@ tbody tr:hover{background:#FBFAF8}
       <div class="src-hint">bcaresearch.com — GIS FullView Portfolio</div>
     </div>
     <div class="src-card" onclick="openModal('blk')">
-      <div class="src-head"><span class="src-firm">BlackRock 60/40 ETF</span><span class="src-badge b-pending" id="badge-blk">No PDF</span></div>
-      <div class="src-meta" id="meta-blk">Benchmark: avg(NDR,BCA) until 6mo history, then 12mo trailing average</div>
-      <div class="src-hint" id="blk-hist-hint">0 months of BlackRock history collected</div>
+      <div class="src-head"><span class="src-firm">BlackRock 60/40 GA Selects</span><span class="src-badge b-pending" id="badge-blk">No PDF</span></div>
+      <div class="src-meta" id="meta-blk">Click to upload</div>
+      <div class="src-hint" id="blk-hist-hint">Aladdin Portfolio Summary — active weights read directly vs. benchmark</div>
     </div>
     <div class="src-card" onclick="openModal('fag')">
       <div class="src-head"><span class="src-firm">Foundation Aggressive ETF</span><span class="src-badge b-pending" id="badge-fag">No PDF</span></div>
@@ -191,7 +194,7 @@ tbody tr:hover{background:#FBFAF8}
 
   <div class="sec">Recorded Monthly History</div>
   <div id="hist-container" style="margin-bottom:.5rem"></div>
-  <div style="font-size:.62rem;color:var(--dim);margin-bottom:1.5rem;line-height:1.7">Up to 12 months retained, newest first. Shows position %, benchmark %, and signal for every recorded asset class per firm. Once 6 months of BlackRock data are on record, BlackRock's benchmark switches automatically from avg(NDR, BCA) to a 12-month trailing average of its own holdings.</div>
+  <div style="font-size:.62rem;color:var(--dim);margin-bottom:1.5rem;line-height:1.7">Up to 12 months retained, newest first. Shows position %, benchmark %, and signal for every recorded asset class per firm. BlackRock and Foundation Aggressive are read as active weights (deviation vs. benchmark) directly from their Aladdin Portfolio Summary reports.</div>
 
   <div class="legend-row">
     <span class="leg-item"><span class="sig sig-HOW">Heavy OW</span> Active &gt; +5pp</span>
@@ -205,7 +208,7 @@ tbody tr:hover{background:#FBFAF8}
   </div>
 
   <div style="font-size:.62rem;color:var(--dim);line-height:1.8;border-top:1px solid var(--line);padding-top:.8rem;margin-top:.5rem">
-    BlackRock benchmark methodology: for the first 6 months of collected BlackRock holdings, each asset's benchmark is the average of NDR's and BCA's stated benchmarks for that asset. Once 6 or more months of BlackRock holdings have been recorded, the benchmark switches to a trailing 12-month average of BlackRock's own holdings in that asset. Internal use only — not investment advice.
+    BlackRock methodology: the BlackRock source is a BlackRock/Aladdin "Portfolio Summary" report (GA Selects 60/40) in which every figure is already a deviation vs. BlackRock's own stated benchmark. Active weights are read and summed directly from the Equity Region, Equity Style, Fixed Income Sector, Fixed Income Credit Quality, and Fixed Income Region "vs Benchmark" pages — no benchmark is computed. Internal use only — not investment advice.
   </div>
 
 </div>
@@ -217,7 +220,7 @@ tbody tr:hover{background:#FBFAF8}
     <div class="src-tabs">
       <div class="src-tab" id="tab-ndr" onclick="setSrc('ndr')">NDR</div>
       <div class="src-tab" id="tab-bca" onclick="setSrc('bca')">BCA GIS</div>
-      <div class="src-tab" id="tab-blk" onclick="setSrc('blk')">BlackRock 60/40</div>
+      <div class="src-tab" id="tab-blk" onclick="setSrc('blk')" style="font-size:.58rem">BlackRock<br>GA Selects</div>
       <div class="src-tab" id="tab-fag" onclick="setSrc('fag')" style="font-size:.58rem">Foundation<br>Aggressive</div>
     </div>
     <div id="upload-section">
@@ -367,37 +370,15 @@ function saveS(){try{localStorage.setItem(STORE,JSON.stringify(S));}catch(e){}}
 function currentMonth(){if(!Array.isArray(S.months)||!S.months.length)return null;return S.months[S.months.length-1];}
 function priorMonths(){if(!Array.isArray(S.months))return [];return S.months.slice(0,-1);}
 
-/* BlackRock holdings-history count (months where blk.pos exists, excluding current) */
-function blkHistoryCount(){
-  return priorMonths().filter(m=>{
-    const a=m.assets||{};
-    return Object.values(a).some(v=>v.blk&&v.blk.pos!==null&&v.blk.pos!==undefined);
-  }).length;
-}
-
-/* BlackRock benchmark for a given asset id, computed from history rules */
-function blkBenchmarkFor(id){
-  const hist=priorMonths();
-  const count=blkHistoryCount();
-  if(count<6){
-    const cm=currentMonth();
-    const ndrBm=cm?.assets?.[id]?.ndr?.bm ?? null;
-    const bcaBm=cm?.assets?.[id]?.bca?.bm ?? null;
-    if(ndrBm!==null&&bcaBm!==null) return (ndrBm+bcaBm)/2;
-    if(ndrBm!==null) return ndrBm;
-    if(bcaBm!==null) return bcaBm;
-    return null;
-  }
-  const last12=hist.slice(-12);
-  const vals=last12.map(m=>m.assets?.[id]?.blk?.pos).filter(v=>v!==null&&v!==undefined);
-  if(!vals.length) return null;
-  return vals.reduce((a,b)=>a+b,0)/vals.length;
-}
+/* BlackRock is now parsed as active weights (deviation vs. benchmark) read
+   directly from its Aladdin Portfolio Summary — no benchmark is computed and no
+   holdings history is required. The former blkHistoryCount()/blkBenchmarkFor()
+   helpers have been removed. */
 
 /* ───────── Modal ───────── */
 let curSrc='ndr';
-const HINTS={ndr:'NDR House Views PDF',bca:'BCA GIS FullView Portfolio PDF',blk:'BlackRock 60/40 Target Allocation ETF PDF',fag:'Foundation Aggressive ETF — Aladdin Portfolio Summary PDF'};
-const SRC_LABELS={ndr:'NDR',bca:'BCA GIS',blk:'BlackRock 60/40 ETF',fag:'Foundation Aggressive ETF'};
+const HINTS={ndr:'NDR House Views PDF',bca:'BCA GIS FullView Portfolio PDF',blk:'BlackRock 60/40 GA Selects — Aladdin Portfolio Summary PDF',fag:'Foundation Aggressive ETF — Aladdin Portfolio Summary PDF'};
+const SRC_LABELS={ndr:'NDR',bca:'BCA GIS',blk:'BlackRock 60/40 GA Selects',fag:'Foundation Aggressive ETF'};
 function openModal(src){setSrc(src||'ndr');document.getElementById('modal-bg').classList.remove('hidden');showUpload();}
 function closeModal(){document.getElementById('modal-bg').classList.add('hidden');showUpload();const es=document.getElementById('edit-section');if(es)es.style.display='none';editContext=null;}
 function bgClick(e){if(e.target===document.getElementById('modal-bg'))closeModal();}
@@ -446,6 +427,10 @@ async function go(file){
 function errState(msg){showParsing('Error',msg);setTimeout(()=>{showUpload();toast(msg,'err');},2500);}
 
 function buildPrompt(src){
+  /* Aladdin "Portfolio Summary" sources (active-weight / deviation-vs-benchmark)
+     have their own dedicated builders and schema. */
+  if(src==='fag') return buildFagPrompt();
+  if(src==='blk') return buildBlkPrompt();
   const schema=`Return ONLY valid JSON, no markdown fences, no commentary:
 {"report_date":"date string found in the document","pages_reviewed":n,"assets":{
 "equities":{"pos":n_or_null,"bm":n_or_null,"view":s_or_null,"quote":s_or_null},
@@ -517,70 +502,7 @@ Mappings from the Macro Overlays table — ONLY use an overlay if it maps cleanl
 Do NOT map "Long EEM/Short ACWI" or any other equity-vs-equity overlay to "em-bonds" — that overlay is an equity trade and has nothing to do with bonds.
 Do NOT map "Long IJR/Short IWM" (small-cap value vs. small-cap broad) to "us-sc" as a clean overweight/underweight signal on small-cap overall — this is a style trade within small-cap, not a directional call on small-cap as an asset class; leave "us-sc" null for BCA unless the main table has a dedicated small-cap row (it typically does not).
 
-Asset classes BCA does NOT publish at all (US Treasuries, International Debt, IG Credit, High Yield, EM Bonds, Oil, Alternatives) — set pos, bm, view, and quote all to null for these. Do not infer them from unrelated rows.`,
-
-    blk:(()=>{
-  const blkCount=blkHistoryCount();
-  if(blkCount<6) return `This is a BlackRock model portfolio document — PHASE 1 (${blkCount}/6 months of history collected — keyword extraction only).
-
-Read ONLY the "Overweight" and "Underweight" bullet lists (page 1) and the Key Takeaways / Trade Rationale narrative. Do NOT read the holdings table. Set pos=null and bm=null for every single asset — only view labels are extracted in this phase.
-
-OW bullet = view "OVERWEIGHT". UW bullet = view "UNDERWEIGHT". Not mentioned = all null.
-
-KEYWORD → ASSET ID MAPPING:
-"U.S. equities" in OW → us-eq=OVERWEIGHT; in UW → UNDERWEIGHT
-"EM equities" / "emerging market equities" in OW → em-eq=OVERWEIGHT
-"Developed market" / "developed international" / "Europe" (equities) in UW → dev-intl=UNDERWEIGHT
-"High Yield" in OW → hy-bonds=OVERWEIGHT
-"U.S. Treasuries" / "Treasuries" / increased "duration underweight" → us-treas=UNDERWEIGHT, bonds=UNDERWEIGHT
-"non-U.S. credit" / "securitized assets" in OW → ig-credit=OVERWEIGHT
-"Energy" sector in OW → oil=OVERWEIGHT
-"U.S. large-cap growth" being reduced → us-gr=UNDERWEIGHT, us-lc=UNDERWEIGHT
-"quality factor" being added / increased → us-val=OVERWEIGHT
-"EM debt" / "emerging market debt" being added → em-bonds=OVERWEIGHT
-Broad equities OW/UW → equities=OVERWEIGHT/UNDERWEIGHT
-Fixed income / bonds UW → bonds=UNDERWEIGHT
-Cash being reduced → cash=UNDERWEIGHT
-
-RULES:
-1. pos=null and bm=null for ALL assets — no numbers whatsoever in Phase 1.
-2. Only set view when explicitly supported by a keyword match. If not mentioned anywhere → all null.
-3. quote MUST contain the exact bullet text or sentence that justified the view.
-4. pages_reviewed: report how many pages you read (minimum 1, the first page + rationale page).`;
-
-  return `This is a BlackRock model portfolio document — PHASE 2 (${blkCount} months of history collected — full holdings extraction).
-
-Extract BOTH view labels from keywords (Part A) AND position weights from the holdings table (Part B). The dashboard computes the benchmark from the 12-month trailing average of recorded BlackRock holdings — set bm=null for all assets.
-
-PART A — Keywords (same as Phase 1 above — read OW/UW bullets, Key Takeaways, Trade Rationale; set view labels per the keyword mapping; quote the exact source text).
-
-PART B — Holdings table: Find the "Portfolio Holdings (%)" table (NOT the "Changes to Holdings" table — changes show deltas like +0.5, never use those as pos values). Use the 60/40 column only.
-
-Determine document type from title on page 1:
-
-IF "Global Allocation (GA) Selects":
-"equities" ← US Equities + Intl/Global Equities + Sector Equities row totals
-"bonds" ← US Fixed Income + Intl/Global Fixed Income row totals
-"cash" ← Cash row. "alts" ← Multi-Asset row (MALOX etc.) or null.
-"us-eq" ← US Equities total (MTUM+SCHG+SPHQ+VLUE etc.)
-"dev-intl" ← IEFA+IEUR+EWJ only (exclude mixed global active ETFs BDVL/BDYN/BFLX)
-"em-eq" ← IEMG+EMXC. "us-lc" ← large-cap ETFs (SCHG). "us-gr" ← growth ETFs (SCHG).
-"us-val" ← quality/value ETFs (SPHQ+VLUE). "us-treas" ← IEF+SCHO+SCHQ+SCHR+TLH.
-"ig-credit" ← LQD+MBB. "hy-bonds" ← BINC+BSIIX+BGCIX.
-"em-bonds" ← CEMB+LEMB (0 if "--"). "intl-debt" ← Intl Fixed Income total.
-"gold" ← null (not held). "oil" ← XLE.
-
-IF "Target Allocation ETF":
-"equities" ← US Equities + Intl/Global Equities + Sector Equities totals.
-"bonds" ← US FI + Intl/Global FI. "cash" ← Cash & Cash Alternatives.
-"alts" ← Alternatives row (IALT+IAU). "us-eq" ← US Equities total.
-"dev-intl" ← CORO+EFG+EFV. "em-eq" ← IEMG. "us-lc" ← IVV+BLCR.
-"us-gr" ← IVW+MTUM. "us-val" ← IVE. "us-treas" ← GOVT+TLH.
-"ig-credit" ← MBB+IUSB. "hy-bonds" ← ICVT. "intl-debt" ← GGOV.
-"em-bonds" ← 0. "gold" ← IAU. "oil" ← 0.
-
-Set bm=null for all.`
-    })()
+Asset classes BCA does NOT publish at all (US Treasuries, International Debt, IG Credit, High Yield, EM Bonds, Oil, Alternatives) — set pos, bm, view, and quote all to null for these. Do not infer them from unrelated rows.`
 
   };
   return `${instructions[src]}\n${common}\n${schema}`;
@@ -648,7 +570,88 @@ Buckets: Large Value | Large Blend | Large Growth | Mid Value | Mid Blend | Mid 
 3. Every computed sum's quote must explicitly list each component in the format "Region(deviation)" and end with "= Xpp".
 4. Return only the JSON object, nothing else.
 
-\${fagSchema}`;
+${fagSchema}`;
+}
+
+function buildBlkPrompt(){
+  const blkSchema=`Return ONLY valid JSON, no markdown fences:
+{"report_date":"date string from document","pages_reviewed":n,"assets":{
+"equities":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"bonds":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"cash":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"alts":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"us-eq":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"dev-intl":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"em-eq":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"us-lc":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"us-sc":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"us-gr":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"us-val":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"us-treas":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"intl-debt":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"ig-credit":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"hy-bonds":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"em-bonds":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"gold":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null},
+"oil":{"aw":n_or_null,"view":s_or_null,"quote":s_or_null}
+}}`;
+  return `This is a "Portfolio Summary" report generated by Aladdin by BlackRock for the "BlackRock 60/40 Global Allocation (GA) Selects Model". Every number in this document is a DEVIATION FROM BENCHMARK (benchmark = "Benchmark GA Selects 60/40") — positive = overweight that region/style/sector, negative = underweight. Extract deviations as "aw" (active weight) values. Do NOT include pos or bm fields.
+
+READ EVERY PAGE before extracting. Use ONLY the five "vs Benchmark" pages named below.
+
+METHODOLOGY — for every asset ID that is a sum: ADD each listed component's deviation INCLUDING its sign (plain arithmetic). Round each result to 2 decimal places. When a page shows the model's value next to the benchmark's value, the deviation is the value in the row explicitly labeled "vs Benchmark" (or the model value minus the benchmark value if only the two raw columns are shown).
+
+═══ PAGE: "Equity Region vs Benchmark" ═══
+Regions: United States | Canada | United Kingdom | Europe Developed | Asia Developed | Japan | Australasia | Latin America | Europe Emerging | Africa/Middle East | Asia Emerging | Other
+
+"equities" ← SUM OF ALL TWELVE region deviations on this page. Quote must list all twelve components with values and show the computed sum.
+"us-eq" ← United States deviation only, used directly as aw. Quote the exact value and direction.
+"dev-intl" ← SUM of these six developed regions: Canada + United Kingdom + Europe Developed + Asia Developed + Japan + Australasia. Quote all six components and the sum.
+"em-eq" ← SUM of these five emerging regions: Latin America + Europe Emerging + Africa/Middle East + Asia Emerging + Other. Quote all five and the sum.
+
+═══ PAGE: "Equity Style vs Benchmark" ═══
+Buckets: Large Value | Large Blend | Large Growth | Mid Value | Mid Blend | Mid Growth | Small Value | Small Blend | Small Growth | Other
+
+"us-lc" ← SUM of Large Value + Large Blend + Large Growth. Quote all three and sum.
+"us-sc" ← SUM of Small Value + Small Blend + Small Growth. Quote all three and sum.
+"us-gr" ← SUM of Large Growth + Mid Growth + Small Growth. Quote all three and sum.
+"us-val" ← SUM of Large Value + Mid Value + Small Value. Quote all three and sum.
+
+═══ PAGE: "Fixed Income Sector vs Benchmark" ═══
+Sectors: Government | Municipal | Corporate | Securitized | Derivatives | Cash & Equivalents | Other
+
+"us-treas" ← Government deviation only, used directly as aw. Quote the exact value and direction.
+"ig-credit" ← Corporate deviation only, used directly as aw. Quote the exact value and direction.
+"cash" ← Cash & Equivalents deviation only, used directly as aw. Quote the exact value and direction.
+
+═══ PAGE: "Fixed Income Credit Quality vs Benchmark" ═══
+Buckets: AAA | AA | A | BBB | BB | B | Below B | Not Rated | Other
+
+"hy-bonds" ← SUM of the high-yield buckets: BB + B + Below B. Quote all three components and the sum (e.g. "BB(+7.98)+B(+5.85)+BelowB(+1.18)=+15.01pp").
+
+═══ PAGE: "Fixed Income Region vs Benchmark" ═══
+Regions: United States | Canada | United Kingdom | Europe Developed | Asia Developed | Japan | Australasia | Latin America | Europe Emerging | Africa/Middle East | Asia Emerging | Other
+
+"intl-debt" ← SUM of these six developed non-US regions: Canada + United Kingdom + Europe Developed + Asia Developed + Japan + Australasia. Quote all six components and the sum. (Do NOT include United States or Other.)
+"em-bonds" ← SUM of these four emerging regions: Latin America + Europe Emerging + Africa/Middle East + Asia Emerging. Quote all four components and the sum. (Do NOT include Other.)
+
+═══ IGNORE ENTIRELY ═══
+- "Equity Sector vs Benchmark" page — do not extract any sector data from it.
+- "Fixed Income Attributes", "Fixed Income Credit Quality" (non-vs-benchmark), "Fixed Income Sector" (non-vs-benchmark), "Fixed Income Maturity" and "Fixed Income Maturity vs Benchmark", "Fixed Income Region" (non-vs-benchmark) pages — do not extract from these.
+- All performance, risk, glossary, appendix, and disclosure pages.
+
+═══ SET TO NULL ═══
+- "bonds": set aw, view, quote all to null. (Fixed-income internal deviations sum to ~0 by construction and do not represent a meaningful top-level bond active weight.)
+- "alts": set aw, view, quote all to null (not present on the pages we use).
+- "gold" and "oil": set aw, view, quote all to null — this report does not isolate gold or oil as a deviation on the pages we use.
+
+═══ RULES ═══
+1. aw is a plain float in percentage points — no % symbol (e.g. 4.40 not "4.40%").
+2. Compute sums by adding all component values with their correct signs. Round to 2 decimal places.
+3. Every computed sum's quote must explicitly list each component in the format "Name(deviation)" and end with "= Xpp". Single-value maps must quote the exact source value.
+4. Return only the JSON object, nothing else.
+
+${blkSchema}`;
 }
 /* Merge a new upload into a NEW month entry (or update current month if same calendar month already exists) */
 function mergeUpload(src,parsed,filename){
@@ -663,7 +666,7 @@ function mergeUpload(src,parsed,filename){
   Object.entries(parsed.assets||{}).forEach(([id,d])=>{
     if(!cm.assets[id])cm.assets[id]={};
     if(src==='blk'){
-      cm.assets[id].blk={pos:d.pos??null,view:d.view??null,quote:d.quote??null,manual:false};
+      cm.assets[id].blk={pos:null,bm:null,aw:d.aw??null,view:d.view??null,quote:d.quote??null,manual:false};
     }else if(src==='fag'){
       cm.assets[id].fag={pos:null,bm:null,aw:d.aw??null,view:d.view??null,quote:d.quote??null,manual:false};
     }else{
@@ -714,7 +717,7 @@ function renderHistory(){
         let sub='';
         if(posStr||bmStr||awStr){
           sub=`<div style="font-size:.6rem;color:var(--dim);margin-bottom:2px;font-family:'IBM Plex Mono',monospace">`;
-          if(awStr&&!posStr) sub+=awStr;
+          if(awStr&&!posStr) sub+=`<span style="color:${d.aw>=0?'var(--ow)':'var(--uw)'}">${awStr}</span>`;
           else { if(posStr) sub+=posStr; if(bmStr) sub+=`/${bmStr}`; if(awStr) sub+=` <span style="color:${d.aw>=0?'var(--ow)':'var(--uw)'}">(${awStr})</span>`; }
           sub+='</div>';
         } else if(d.view) sub=`<div style="font-size:.6rem;color:var(--dim);margin-bottom:2px">${d.view}</div>`;
@@ -739,13 +742,15 @@ function renderSrcBar(){
     if(src.status==='ready'){badge.textContent='Ready';badge.className='src-badge b-ready';meta.innerHTML=`<strong>${src.filename}</strong><br>${src.retrieved}${src.pages_reviewed?` · ${src.pages_reviewed} pages reviewed`:''}`;}
     else{badge.textContent='No PDF';badge.className='src-badge b-pending';meta.textContent='Click to upload';}
   });
-  const blk=S.sources.blk,badgeB=document.getElementById('badge-blk');
+  const blk=S.sources.blk,badgeB=document.getElementById('badge-blk'),metaB=document.getElementById('meta-blk');
   badgeB.textContent=blk.status==='ready'?'Ready':'No PDF';
   badgeB.className=blk.status==='ready'?'src-badge b-ready':'src-badge b-pending';
-  const count=blkHistoryCount();
-  document.getElementById('blk-hist-hint').textContent=count<6
-    ? `${count} of 6 months collected — benchmark = avg(NDR, BCA)`
-    : `${count} months collected — benchmark = 12mo trailing average of BlackRock's own holdings`;
+  if(metaB){
+    if(blk.status==='ready') metaB.innerHTML=`<strong>${blk.filename}</strong><br>${blk.retrieved}${blk.pages_reviewed?` · ${blk.pages_reviewed} pages reviewed`:''}`;
+    else metaB.textContent='Click to upload';
+  }
+  const blkHint=document.getElementById('blk-hist-hint');
+  if(blkHint) blkHint.textContent='Aladdin Portfolio Summary — active weights read directly vs. benchmark';
   const fag4=S.sources.fag,badge4=document.getElementById('badge-fag'),meta4=document.getElementById('meta-fag');
   if(fag4&&badge4){
     badge4.textContent=fag4.status==='ready'?'Ready':'No PDF';
@@ -763,17 +768,8 @@ function renderTable(tbodyId,defs){
   defs.forEach(def=>{
     const a=cm.assets[def.id]||{};
     const ndr=a.ndr||null, bca=a.bca||null;
-    /* BLK: Phase 1 (view only) and Phase 2 (pos+benchmark) both handled */
-    let blk=null;
-    if(a.blk){
-      if(a.blk.pos!==null&&a.blk.pos!==undefined){
-        const bm=blkBenchmarkFor(def.id);
-        const aw=bm!==null?Math.round((a.blk.pos-bm)*100)/100:null;
-        blk={pos:a.blk.pos,bm,aw,view:a.blk.view||null,quote:a.blk.quote||null,manual:a.blk.manual||false};
-      } else if(a.blk.view||a.blk.aw!==null&&a.blk.aw!==undefined){
-        blk={pos:null,bm:null,aw:a.blk.aw??null,view:a.blk.view||null,quote:a.blk.quote||null,manual:a.blk.manual||false};
-      }
-    }
+    /* BLK: active weight (deviation vs. benchmark) stored directly from the Aladdin summary */
+    const blk=a.blk?{pos:null,bm:null,aw:a.blk.aw??null,view:a.blk.view||null,quote:a.blk.quote||null,manual:a.blk.manual||false}:null;
     /* FAG: aw stored directly */
     const fag=a.fag||null;
     if(!ndr&&!bca&&!blk&&!fag) return;
@@ -828,10 +824,8 @@ function editCell(assetId,firmLabel){
   const iS='width:100%;padding:.5rem .7rem;border:1.5px solid var(--line2);border-radius:5px;font-size:.84rem;font-family:inherit;margin-top:.2rem;box-sizing:border-box;';
   const lS='font-size:.72rem;font-weight:700;color:var(--ink2);display:block;margin-bottom:.15rem;';
   let f='';
-  if(firmKey==='fag'){
+  if(firmKey==='fag'||firmKey==='blk'){
     f+='<div><label style="'+lS+'">Active Weight (pp) — deviation from benchmark</label><input id="edit-aw" type="number" step="0.01" value="'+(existing.aw??'')+'" style="'+iS+'" placeholder="e.g. 4.09"/></div>';
-  } else if(firmKey==='blk'){
-    f+='<div><label style="'+lS+'">Position % (ETF holding)</label><input id="edit-pos" type="number" step="0.1" value="'+(existing.pos??'')+'" style="'+iS+'" placeholder="e.g. 44.0"/></div>';
   } else {
     f+='<div><label style="'+lS+'">Position %</label><input id="edit-pos" type="number" step="0.1" value="'+(existing.pos??'')+'" style="'+iS+'" placeholder="e.g. 60.0"/></div>';
     f+='<div><label style="'+lS+'">Benchmark %</label><input id="edit-bm" type="number" step="0.1" value="'+(existing.bm??'')+'" style="'+iS+'" placeholder="e.g. 55.0"/></div>';
@@ -857,8 +851,8 @@ function saveEdit(){
     const aw=parseFloat(document.getElementById('edit-aw')?.value);
     cm.assets[assetId].fag={pos:null,bm:null,aw:isNaN(aw)?null:aw,view:view||null,quote:existing.quote||null,manual:true};
   } else if(firmKey==='blk'){
-    const pos=parseFloat(document.getElementById('edit-pos')?.value);
-    cm.assets[assetId].blk={pos:isNaN(pos)?null:pos,view:view||null,quote:existing.quote||null,manual:true};
+    const aw=parseFloat(document.getElementById('edit-aw')?.value);
+    cm.assets[assetId].blk={pos:null,bm:null,aw:isNaN(aw)?null:aw,view:view||null,quote:existing.quote||null,manual:true};
   } else {
     const pos=parseFloat(document.getElementById('edit-pos')?.value);
     const bm=parseFloat(document.getElementById('edit-bm')?.value);
