@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-07-01",
+  "as_of": "2026-08-01",
   "sources": {
     "ndr": {
       "status": "failed",
@@ -9,7 +9,7 @@
     },
     "bca": {
       "status": "failed",
-      "message": "BCA: logged in (page: 'Global Investment Strategy | BCA Research') but could not parse FullView table. Page layout may have changed. Update BCA_MAP or _parse_html().",
+      "message": "BCA: logged in (page: 'CoreMacro | BCA Research') but could not parse FullView table. Page layout may have changed. Update BCA_MAP or _parse_html().",
       "retrieved": "none",
       "page": "BCA GIS FullView Portfolio \u2014 bcaresearch.com/site/gis/home"
     },
@@ -22,20 +22,7 @@
   },
   "assets": [
     {
-      "id": "bonds",
-      "ndrActiveWt": null,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": null,
-      "bcaActiveWt": null,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": null,
-      "biiSignal": "Neutral",
-      "biiScore": 0
-    },
-    {
-      "id": "us-lc",
+      "id": "equities",
       "ndrActiveWt": null,
       "ndrPosition": null,
       "ndrBenchmark": null,
@@ -48,59 +35,7 @@
       "biiScore": 1
     },
     {
-      "id": "em-eq",
-      "ndrActiveWt": null,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": null,
-      "bcaActiveWt": null,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": null,
-      "biiSignal": "Neutral",
-      "biiScore": 0
-    },
-    {
-      "id": "dev-intl",
-      "ndrActiveWt": null,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": null,
-      "bcaActiveWt": null,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": null,
-      "biiSignal": "Neutral",
-      "biiScore": 0
-    },
-    {
-      "id": "ig-credit",
-      "ndrActiveWt": null,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": null,
-      "bcaActiveWt": null,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": null,
-      "biiSignal": "Underweight",
-      "biiScore": -1
-    },
-    {
-      "id": "hy-bonds",
-      "ndrActiveWt": null,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": null,
-      "bcaActiveWt": null,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": null,
-      "biiSignal": "Neutral",
-      "biiScore": 0
-    },
-    {
-      "id": "em-bonds",
+      "id": "us-lc",
       "ndrActiveWt": null,
       "ndrPosition": null,
       "ndrBenchmark": null,
@@ -458,6 +393,23 @@
         },
         {
           "id": "em-bonds",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 0
+        }
+      ]
+    },
+    {
+      "month": "Aug 2026",
+      "assets": [
+        {
+          "id": "equities",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 1
+        },
+        {
+          "id": "us-lc",
           "ndrScore": null,
           "bcaScore": null,
           "biiScore": 0
