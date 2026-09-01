@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-08-01",
+  "as_of": "2026-09-01",
   "sources": {
     "ndr": {
       "status": "failed",
@@ -401,6 +401,23 @@
     },
     {
       "month": "Aug 2026",
+      "assets": [
+        {
+          "id": "equities",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 1
+        },
+        {
+          "id": "us-lc",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 0
+        }
+      ]
+    },
+    {
+      "month": "Sep 2026",
       "assets": [
         {
           "id": "equities",
