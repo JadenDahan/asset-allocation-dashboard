@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-09-01",
+  "as_of": "2026-10-01",
   "sources": {
     "ndr": {
       "status": "failed",
@@ -9,7 +9,7 @@
     },
     "bca": {
       "status": "failed",
-      "message": "BCA: logged in (page: 'CoreMacro | BCA Research') but could not parse FullView table. Page layout may have changed. Update BCA_MAP or _parse_html().",
+      "message": "BCA login rejected \u2014 check BCA_USER and BCA_PASS in GitHub Secrets. Final URL: https://auth.bcaresearch.com/u/login?state=hKFo2SBlSThjSkZkZ18wVDZyM01TTmd1RzhWRlhYMnZRcE9BQ6Fur3VuaXZlcnNhbC1sb2dpbqN0aWTZIFljaWhybnBFM2VSamR2WlBtc0liZE03SFd1Y0tQRVJqo2NpZNkgemNlc2s0cFZDNTNtUnVsY092UHpqdlc2YVlUS2hLRWM",
       "retrieved": "none",
       "page": "BCA GIS FullView Portfolio \u2014 bcaresearch.com/site/gis/home"
     },
@@ -33,19 +33,6 @@
       "bcaScore": null,
       "biiSignal": "Overweight",
       "biiScore": 1
-    },
-    {
-      "id": "us-lc",
-      "ndrActiveWt": null,
-      "ndrPosition": null,
-      "ndrBenchmark": null,
-      "ndrScore": null,
-      "bcaActiveWt": null,
-      "bcaPosition": null,
-      "bcaBenchmark": null,
-      "bcaScore": null,
-      "biiSignal": "Neutral",
-      "biiScore": 0
     }
   ],
   "history": [
@@ -430,6 +417,17 @@
           "ndrScore": null,
           "bcaScore": null,
           "biiScore": 0
+        }
+      ]
+    },
+    {
+      "month": "Oct 2026",
+      "assets": [
+        {
+          "id": "equities",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 1
         }
       ]
     }
