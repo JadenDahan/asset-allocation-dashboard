@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-10-01",
+  "as_of": "2026-11-01",
   "sources": {
     "ndr": {
       "status": "failed",
@@ -9,7 +9,7 @@
     },
     "bca": {
       "status": "failed",
-      "message": "BCA login rejected \u2014 check BCA_USER and BCA_PASS in GitHub Secrets. Final URL: https://auth.bcaresearch.com/u/login?state=hKFo2SBlSThjSkZkZ18wVDZyM01TTmd1RzhWRlhYMnZRcE9BQ6Fur3VuaXZlcnNhbC1sb2dpbqN0aWTZIFljaWhybnBFM2VSamR2WlBtc0liZE03SFd1Y0tQRVJqo2NpZNkgemNlc2s0cFZDNTNtUnVsY092UHpqdlc2YVlUS2hLRWM",
+      "message": "BCA login rejected \u2014 check BCA_USER and BCA_PASS in GitHub Secrets. Final URL: https://auth.bcaresearch.com/u/login?state=hKFo2SBkcHBYbWtFY0xfR3V0aUR5aDdoRmNXbDhFbE5vUERvRqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIHpOUHhaMFNmTE9UQ3JSdFlobUE0ZnNhMUdFZWZzcUlho2NpZNkgemNlc2s0cFZDNTNtUnVsY092UHpqdlc2YVlUS2hLRWM",
       "retrieved": "none",
       "page": "BCA GIS FullView Portfolio \u2014 bcaresearch.com/site/gis/home"
     },
@@ -422,6 +422,17 @@
     },
     {
       "month": "Oct 2026",
+      "assets": [
+        {
+          "id": "equities",
+          "ndrScore": null,
+          "bcaScore": null,
+          "biiScore": 1
+        }
+      ]
+    },
+    {
+      "month": "Nov 2026",
       "assets": [
         {
           "id": "equities",
